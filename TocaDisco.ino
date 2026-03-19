@@ -129,23 +129,24 @@ void setup() {
   //Serial.begin(115200);  // use Serial normal do ESP32 para debug
 
   // servo
-  pinMode(servoPin, OUTPUT);
-  digitalWrite(servoPin, LOW);  // Começa low para evitar ruído
+  //pinMode(servoPin, OUTPUT);
+  //digitalWrite(servoPin, LOW);  // Começa low para evitar ruído
 
   // Envie um pulso manual longo para forçar ~90° (ou 180° se preferir) antes da lib
   // Pulso de 1500 µs = ~90° neutro (ajuste para seu servo: 500=0°, 2500=180°)
-  digitalWrite(servoPin, HIGH);
-  delayMicroseconds(1500);  // ← Para 90°
+  ///digitalWrite(servoPin, HIGH);
+  //delayMicroseconds(1500);  // ← Para 90°
   // Ou delayMicroseconds(2500); para 180° se quiser começar lá
-  digitalWrite(servoPin, LOW);
-  delay(30);  // Espera um frame completo de 50Hz para o servo "travar" na posição
+  //digitalWrite(servoPin, LOW);
+  //delay(30);  // Espera um frame completo de 50Hz para o servo "travar" na posição
+  
   //configure our main settings in the ESP32 LEDC registry
 	Esp32LedcRegistry::instance()->begin(LEDC_CONFIG_ESP32_S3);		//change this for the relevant 
   BestAvailableFactory oTimerChannelFactory;						//used to select the best available timer & channel based on the hardware setup
 	ServoFactoryDecorator oFactoryDecorator(oTimerChannelFactory);	//let this ServoFactoryDecorator define the servo frequency to use and such
 	//the above two are needed (variable scope related, in 'begin' only)
 	
-	
+	//oServo.moveTo(posicaoServo, 100, true);
   if (!oServo.begin(oFactoryDecorator, servoPin)) {				//3rd parameter is the default angle to start from: 90 degrees in this case
 		//Serial.println("  failed to init the servo..");
     pixels.setPixelColor(0, pixels.Color(255, 255, 0));
@@ -154,7 +155,7 @@ void setup() {
 	}
   else
   {
-    oServo.moveTo(posicaoServo, 500, true);  // Movimento rápido de 0.5s para reforçar
+    //oServo.moveTo(posicaoServo, 500, true);  // Movimento rápido de 0.5s para reforçar
   }
 
   // oServo.moveTo(  0.0,  5000, true);							//move to 0 degrees in 5 seconds, and make this a blocking call
@@ -241,16 +242,21 @@ void setup() {
     
     if (!motorLigado)
     {
+      // liga motor
       setRPM(targetRPM);
     //   startRampTo(targetRPM,3);
       posicaoServo = 120.0;
-      oServo.moveTo(posicaoServo, 4000, true);
+      //ledcDetachPin(servoPin);
+      oServo.moveTo(posicaoServo, 3000, true);
     }
     else
     {
+      // desliga motor
       setRPM(0);
       posicaoServo = 90.0;
-      oServo.moveTo(posicaoServo, 4000, true);
+      oServo.moveTo(posicaoServo, 3000, false);
+      //delay(4100);  // ou melhor: use um timer não bloqueante
+      //ledcDetachPin(servoPin);
     }
       motorLigado = !motorLigado;
 
