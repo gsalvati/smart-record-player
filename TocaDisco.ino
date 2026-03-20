@@ -6,10 +6,14 @@
 #include <ESP32ServoController.h>
 #include <ESPTelnet.h>
 #include <Adafruit_NeoPixel.h>
+#include <Wire.h>
+#include "MT6701.hpp"
+
 
 ESPTelnet telnet;
 using namespace MDO::ESP32ServoController;
 ServoController oServo;
+MT6701 tonearm;
 
 
 #define DEBUG_PRINT(x) \
@@ -63,6 +67,10 @@ static const int servoPin = 18;
 
 
 bool motorLigado = false;  // Estado inicial
+bool posicaoLift = true;  // Estado inicial
+float posicaoLiftMin = 120.0; // baixado
+float posicaoLiftMax = 80.0; // baixado
+bool finalDisco = false;
 
 // Pinos UART para o TMC2209
 #define RXD2 16              // PDN/UART do driver
@@ -85,7 +93,7 @@ WebServer server(80);
 float rpmSelecionado = 33.333;
 float ajusteFino33 = 1.0;
 float ajusteFino45 = 1.0;
-float posicaoServo = 90.0;
+float posicaoServo = posicaoLiftMax;
 bool atualizando = false;
 
 // Interface Web (HTML/JavaScript)
@@ -103,13 +111,38 @@ void handleRoot() {
   html += "<button class='btn' style='background:#444; color:white;' onclick=\"location.href='/set?rpm=45'\">45 RPM</button></div>";
   html += "<h3>Ajuste Fino (" + String(rpmSelecionado) + " RPM)</h3>";
   html += "<input type='range' min='0.70' max='1.30' step='0.002' value='" + String(rpmSelecionado > 40 ? ajusteFino45 : ajusteFino33) + "' class='slider' onchange=\"fetch('/ajuste?val='+this.value)\">";
-  html += "<h3>Controle do Servo (90-120°)</h3>";
-  html += "<input type='range' min='90' max='120' value='" + String(posicaoServo) + "' class='slider' onchange=\"fetch('/servo?pos='+this.value)\">";
+  html += "<h3>Controle do Servo ("+String(posicaoLiftMax)+"-"+String(posicaoLiftMin)+"°)</h3>";
+  html += "<input type='range' min='"+String(posicaoLiftMax)+"' max='"+String(posicaoLiftMin)+"' value='" + String(posicaoServo) + "' class='slider' onchange=\"fetch('/servo?pos='+this.value)\">";
   html += "<p>Posição atual: <span id='pos'>" + String(posicaoServo) + "</span>°</p>";
   html += "</body></html>";
   server.send(200, "text/html", html);
 }
 
+void toggleMotor( bool ligar = false)
+{
+
+  if (ligar)
+  {
+    // liga motor
+    setRPM(targetRPM);
+  //   startRampTo(targetRPM,3);
+    posicaoServo = posicaoLiftMin;
+    //ledcDetachPin(servoPin);
+    oServo.moveTo(posicaoServo, 3000, true);
+    posicaoLift = false;
+  }
+  else
+  {
+    // desliga motor
+    setRPM(0);
+    posicaoServo = posicaoLiftMax;
+    oServo.moveTo(posicaoServo, 3000, false);
+    posicaoLift = true;
+    //delay(4100);  // ou melhor: use um timer não bloqueante
+    //ledcDetachPin(servoPin);
+  }
+  motorLigado = !motorLigado;
+}
 
 void startRampTo(float newTargetRPM, float accelTimeSeconds = 2.0) {
   targetRPMSet = newTargetRPM;
@@ -239,26 +272,7 @@ void setup() {
     
     // No TMC2209: LOW = Ativado, HIGH = Desativado (bobinas soltas)
     //digitalWrite(pinoEnable, motorLigado ? LOW : HIGH);
-    
-    if (!motorLigado)
-    {
-      // liga motor
-      setRPM(targetRPM);
-    //   startRampTo(targetRPM,3);
-      posicaoServo = 120.0;
-      //ledcDetachPin(servoPin);
-      oServo.moveTo(posicaoServo, 3000, true);
-    }
-    else
-    {
-      // desliga motor
-      setRPM(0);
-      posicaoServo = 90.0;
-      oServo.moveTo(posicaoServo, 3000, false);
-      //delay(4100);  // ou melhor: use um timer não bloqueante
-      //ledcDetachPin(servoPin);
-    }
-      motorLigado = !motorLigado;
+    toggleMotor(!motorLigado);
 
     server.sendHeader("Location", "/");
     server.send(303);
@@ -266,7 +280,7 @@ void setup() {
   server.on("/servo", []() {
     if (server.hasArg("pos")) {
       int novaPos = server.arg("pos").toFloat();
-      if (novaPos >= 90.0 && novaPos <= 120.0) {
+      if (novaPos >= posicaoLiftMax && novaPos <= posicaoLiftMin) {
         posicaoServo = novaPos;
         oServo.moveTo(posicaoServo, 1500, true);
         //lift.write(posicaoServo);        
@@ -283,6 +297,9 @@ void setup() {
   ArduinoOTA.begin();
   server.begin();
 
+  Wire.begin(36, 35); // SDA, SCL
+  //Wire.setClock(400000);
+  tonearm.begin();
   
 
   //calcularIntervalo();
@@ -320,6 +337,37 @@ void loop() {
   }
 
   wifiConectadoAnterior = wifiConectadoAgora;
+
+  float tonearmAngle = tonearm.getAngleDegrees();
+  DEBUG_PRINTF("angulo tonearm: %.1ff\n",tonearmAngle);
+  if ((tonearmAngle > 165.0 || tonearmAngle < 130.0) && motorLigado)
+  {    
+    DEBUG_PRINT("angulo DESLIGANDO");
+    toggleMotor(false);
+    if (tonearmAngle < 130)
+    {
+      DEBUG_PRINT("FINAL DISCO");
+      finalDisco = true;
+    }
+    if (tonearmAngle > 165)
+    {
+      DEBUG_PRINT("FINAL DISCO OFF");
+      finalDisco = false;
+    }
+  }
+  else if ((tonearmAngle <= 165.0 && tonearmAngle >= 130.0) && !motorLigado)
+  {
+    if (!finalDisco)
+    {
+      DEBUG_PRINT("angulo LIGANDO");
+      toggleMotor(true);
+    }
+  }
+  else if (!motorLigado && tonearmAngle > 165)
+  {
+    DEBUG_PRINT("FINAL DISCO OFF");
+    finalDisco = false;
+  }
 
   // unsigned long now = millis();
 
