@@ -8,7 +8,9 @@
 #include <Adafruit_NeoPixel.h>
 #include <Wire.h>
 #include "MT6701.hpp"
+#include <Preferences.h>
 
+Preferences prefs;
 
 ESPTelnet telnet;
 using namespace MDO::ESP32ServoController;
@@ -69,8 +71,13 @@ static const int servoPin = 18;
 bool motorLigado = false;  // Estado inicial
 bool posicaoLift = true;  // Estado inicial
 float posicaoLiftMin = 120.0; // baixado
-float posicaoLiftMax = 80.0; // baixado
+float posicaoLiftMax = 80.0; // levantado
 bool finalDisco = false;
+
+// Debounce para ligar motor ao baixar tonearm
+unsigned long lowAngleStartTime = 0;      // Timestamp quando ângulo primeiro <=160°
+unsigned long DEBOUNCE_DELAY_MS = 1500;  // 2 segundos
+bool debounceLowAngleActive = false;      // Flag para rastrear se estamos contando tempo
 
 // Pinos UART para o TMC2209
 #define RXD2 16              // PDN/UART do driver
@@ -109,11 +116,106 @@ void handleRoot() {
 
   html += "<div><button class='btn' style='background:#444; color:white;' onclick=\"location.href='/set?rpm=33'\">33 1/3 RPM</button>";
   html += "<button class='btn' style='background:#444; color:white;' onclick=\"location.href='/set?rpm=45'\">45 RPM</button></div>";
+
+    // ===================== VISUALIZADOR SVG =====================
+  html += "<br><br><h3>Visualizador em Tempo Real</h3>";
+  html += "<div style='background:#0a0a0a; padding:15px; border-radius:15px; display:inline-block;'>";
+  html += R"=====(
+<svg id="turntable" width="720" height="520" viewBox="0 0 520 520" xmlns="http://www.w3.org/2000/svg">
+
+  <!-- Base do toca-discos 
+  <circle cx="260" cy="260" r="245" fill="#1c1c1c" stroke="#333" stroke-width="45"/>-->
+
+  <!-- Platter Group (gira) -->
+  <g id="platter">
+    <circle cx="160"" cy="260" r="205" fill="#111" stroke="#444" stroke-width="5"/>
+    
+    <!-- Ranhuras do vinil -->
+    <circle cx="160"" cy="260" r="185" fill="none" stroke="#222" stroke-width="7"/>
+    <circle cx="160"" cy="260" r="165" fill="none" stroke="#222" stroke-width="6"/>
+    <circle cx="160"" cy="260" r="145" fill="none" stroke="#222" stroke-width="5"/>
+    <circle cx="160"" cy="260" r="125" fill="none" stroke="#222" stroke-width="4"/>
+    <circle cx="160"" cy="260" r="105" fill="none" stroke="#222" stroke-width="3"/>
+    
+    <!-- Etiqueta central -->
+    <circle cx="160"" cy="260" r="62" fill="#1a1a1a"/>
+    <circle cx="160"" cy="260" r="48" fill="#333"/>
+    <text x="160" y="270" text-anchor="middle" fill="#aaa" font-size="22" font-family="Arial">GIAN</text>
+  </g>
+
+  <!-- Eixo central -->
+  <circle cx="160"" cy="260" r="14" fill="#555"/>
+
+  <!-- Pivô do tonearm -->
+  <circle cx="445" cy="155" r="38" fill="#222" stroke="#555" stroke-width="12"/>
+
+  <!-- Tonearm completo -->
+  <g id="tonearm" transform="rotate(-42 445 155)">
+    <!-- Contrapeso -->
+    <rect x="425" y="95" width="48" height="28" rx="8" fill="#333"/>
+    
+    <!-- Braço principal -->
+    <line x1="445" y1="155" x2="180" y2="270" stroke="#1f1f1f" stroke-width="17" stroke-linecap="round"></line>
+    
+    <!-- Headshell 
+    <polygon points="235,235 205,205 255,195" fill="#555" stroke="#222" stroke-width="6"/> -->
+    <rect x="155" y="250" width="58" height="28" rx="8" fill="#333"></rect>
+    
+    <!-- Agulha 
+    <line x1="225" y1="220" x2="208" y2="245" stroke="#ffdd44" stroke-width="4" stroke-linecap="round"/>-->
+  </g>
+
+</svg>
+)=====";
+  html += "</div>";
+
   html += "<h3>Ajuste Fino (" + String(rpmSelecionado) + " RPM)</h3>";
   html += "<input type='range' min='0.70' max='1.30' step='0.002' value='" + String(rpmSelecionado > 40 ? ajusteFino45 : ajusteFino33) + "' class='slider' onchange=\"fetch('/ajuste?val='+this.value)\">";
   html += "<h3>Controle do Servo ("+String(posicaoLiftMax)+"-"+String(posicaoLiftMin)+"°)</h3>";
   html += "<input type='range' min='"+String(posicaoLiftMax)+"' max='"+String(posicaoLiftMin)+"' value='" + String(posicaoServo) + "' class='slider' onchange=\"fetch('/servo?pos='+this.value)\">";
   html += "<p>Posição atual: <span id='pos'>" + String(posicaoServo) + "</span>°</p>";
+  html += "<br><br><button class='btn' style='background:#3498db; color:white; width:80%;' ";
+  html += "onclick=\"location.href='/config'\">CONFIGURAÇÕES AVANÇADAS</button>";
+
+   html += R"=====(
+<style>
+  #platter {
+    transform-origin: 160px 260px;
+    animation: spin 1.8s linear infinite;
+    animation-play-state: paused;
+  }
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+  }
+</style>
+
+<script>
+function map(val, inMin, inMax, outMin, outMax) {
+  return (val - inMin) * (outMax - outMin) / (inMax - inMin) + outMin;
+}
+
+function updateVisualizer() {
+  fetch('/status')
+    .then(r => r.json())
+    .then(data => {
+      // Girar o disco conforme RPM
+      const speed = data.rpm > 40 ? 1.333 : 1.8;           // 45 ou 33.3 RPM
+      document.getElementById('platter').style.animationDuration = speed + 's';
+      document.getElementById('platter').style.animationPlayState = data.motorLigado ? 'running' : 'paused';
+
+      // Mover o tonearm (ajuste os números conforme seus valores reais do MT6701)
+      const visualAngle = map(data.tonearmAngle, 179, 130, -70, -20);   // ← AJUSTE AQUI se necessário
+      document.getElementById('tonearm').setAttribute('transform', 
+        `rotate(${visualAngle} 445 155)`);
+    });
+}
+
+// Atualiza a cada 180ms (suave e leve)
+setInterval(updateVisualizer, 180);
+</script>
+)=====";
+
   html += "</body></html>";
   server.send(200, "text/html", html);
 }
@@ -128,7 +230,7 @@ void toggleMotor( bool ligar = false)
   //   startRampTo(targetRPM,3);
     posicaoServo = posicaoLiftMin;
     //ledcDetachPin(servoPin);
-    oServo.moveTo(posicaoServo, 3000, true);
+    oServo.moveTo(posicaoServo, 600, true);
     posicaoLift = false;
   }
   else
@@ -136,7 +238,7 @@ void toggleMotor( bool ligar = false)
     // desliga motor
     setRPM(0);
     posicaoServo = posicaoLiftMax;
-    oServo.moveTo(posicaoServo, 3000, false);
+    oServo.moveTo(posicaoServo, 400, false);
     posicaoLift = true;
     //delay(4100);  // ou melhor: use um timer não bloqueante
     //ledcDetachPin(servoPin);
@@ -282,12 +384,92 @@ void setup() {
       int novaPos = server.arg("pos").toFloat();
       if (novaPos >= posicaoLiftMax && novaPos <= posicaoLiftMin) {
         posicaoServo = novaPos;
-        oServo.moveTo(posicaoServo, 1500, true);
+        oServo.moveTo(posicaoServo, 200, true);
         //lift.write(posicaoServo);        
         // Opcional: atualiza o HTML dinamicamente, mas fetch simples já basta
       }
     }
     server.send(200, "text/plain", String(posicaoServo));
+  });
+
+  server.on("/config", HTTP_GET, []() {
+    // Mostra página de configuração
+    String html = "<html><head><meta name='viewport' content='width=device-width, initial-scale=1.0'>";
+    html += "<style>body{font-family:sans-serif; text-align:center; background:#121212; color:white;}";
+    html += "input, button{margin:10px; padding:10px; font-size:16px; width:80%; max-width:400px;}</style></head>";
+    html += "<body><h1>Configurações do Toca-Discos Gian</h1>";
+
+    html += "<h3>Posição Servo Levantado (liftMax)</h3>";
+    html += "<input type='number' id='liftMax' step='0.1' value='" + String(posicaoLiftMax, 1) + "'>";
+
+    html += "<h3>Posição Servo Baixado (liftMin)</h3>";
+    html += "<input type='number' id='liftMin' step='0.1' value='" + String(posicaoLiftMin, 1) + "'>";
+
+    html += "<h3>Tempo para ligar motor (debounce em segundos)</h3>";
+    html += "<input type='number' id='debounceSec' step='0.1' min='0.5' max='10' value='" + String(DEBOUNCE_DELAY_MS / 1000.0, 2) + "'>";
+
+    html += "<br><button onclick='salvar()'>SALVAR CONFIGURAÇÕES</button>";
+    html += "<p id='status'></p>";
+
+    html += "<script>";
+    html += "function salvar() {";
+    html += "  let liftMax = document.getElementById('liftMax').value;";
+    html += "  let liftMin = document.getElementById('liftMin').value;";
+    html += "  let debounceSec = document.getElementById('debounceSec').value;";
+    html += "  fetch('/salvar?liftMax=' + liftMax + '&liftMin=' + liftMin + '&debounce=' + debounceSec)";
+    html += "    .then(r => r.text()).then(txt => {";
+    html += "      document.getElementById('status').innerText = txt;";
+    html += "    });";
+    html += "}";
+    html += "</script></body></html>";
+
+    server.send(200, "text/html", html);
+  });
+
+  server.on("/salvar", []() {
+    if (server.hasArg("liftMax") && server.hasArg("liftMin") && server.hasArg("debounce")) {
+      float newMax = server.arg("liftMax").toFloat();
+      float newMin = server.arg("liftMin").toFloat();
+      float newDebounceSec = server.arg("debounce").toFloat();
+
+      // Validação básica
+      if (newMax >= 0 && newMax <= 180 && newMin >= 0 && newMin <= 180 && newMax < newMin &&
+          newDebounceSec >= 0.5 && newDebounceSec <= 10.0) {
+
+        prefs.begin("config", false);
+        prefs.putFloat("liftMax", newMax);
+        prefs.putFloat("liftMin", newMin);
+        prefs.putULong("debounceMs", (unsigned long)(newDebounceSec * 1000));
+        prefs.end();
+
+        // Atualiza variáveis em tempo real
+        posicaoLiftMax = newMax;
+        posicaoLiftMin = newMin;
+        DEBOUNCE_DELAY_MS = (unsigned long)(newDebounceSec * 1000);
+
+        telnet.printf("Config salva: liftMax=%.1f, liftMin=%.1f, debounce=%lu ms\n",
+                      posicaoLiftMax, posicaoLiftMin, DEBOUNCE_DELAY_MS);
+
+        server.send(200, "text/plain", "Configurações salvas com sucesso!");
+          
+        //delay(3000);
+        //ESP.restart();
+      } else {
+        server.send(400, "text/plain", "Valores inválidos. Verifique os limites.");
+      }
+    } else {
+      server.send(400, "text/plain", "Parâmetros ausentes.");
+    }
+  });
+
+    // ===================== NOVA ROTA STATUS =====================
+  server.on("/status", []() {
+    String json = "{";
+    json += "\"motorLigado\":" + String(motorLigado ? "true" : "false") + ",";
+    json += "\"tonearmAngle\":" + String(tonearm.getAngleDegrees(), 1) + ",";
+    json += "\"rpm\":" + String(rpmSelecionado, 1);
+    json += "}";
+    server.send(200, "application/json", json);
   });
 
   ArduinoOTA.onStart([]() {
@@ -296,6 +478,21 @@ void setup() {
   });
   ArduinoOTA.begin();
   server.begin();
+
+  // Carregar configurações salvas da NVS
+  prefs.begin("config", false);  // namespace "config"
+
+  posicaoLiftMax = prefs.getFloat("liftMax", 80.0f);     // default 80.0 se não existir
+  posicaoLiftMin = prefs.getFloat("liftMin", 120.0f);    // default 120.0
+  DEBOUNCE_DELAY_MS = prefs.getULong("debounceMs", 2000UL);  // default 2000 ms
+
+  prefs.end();
+
+  telnet.printf("Config carregada: liftMax=%.1f°, liftMin=%.1f°, debounce=%lu ms\n",
+                posicaoLiftMax, posicaoLiftMin, DEBOUNCE_DELAY_MS);
+
+  // Atualiza posicaoServo inicial com o valor salvo
+  posicaoServo = posicaoLiftMax;
 
   Wire.begin(36, 35); // SDA, SCL
   //Wire.setClock(400000);
@@ -338,35 +535,57 @@ void loop() {
 
   wifiConectadoAnterior = wifiConectadoAgora;
 
+  // acionar o motor conforme o angulo do braço
   float tonearmAngle = tonearm.getAngleDegrees();
-  DEBUG_PRINTF("angulo tonearm: %.1ff\n",tonearmAngle);
-  if ((tonearmAngle > 165.0 || tonearmAngle < 130.0) && motorLigado)
-  {    
-    DEBUG_PRINT("angulo DESLIGANDO");
-    toggleMotor(false);
-    if (tonearmAngle < 130)
-    {
-      DEBUG_PRINT("FINAL DISCO");
-      finalDisco = true;
-    }
-    if (tonearmAngle > 165)
-    {
-      DEBUG_PRINT("FINAL DISCO OFF");
+  DEBUG_PRINTF("angulo tonearm: %.1f\n", tonearmAngle);  // Mantenha para debug
+
+  // Sempre resetar finalDisco quando o braço for levantado (>160°)
+  // Isso permite religar depois de um "fim de disco" se o usuário levantar e abaixar novamente
+  if (tonearmAngle > 160.0) {
+    if (finalDisco) {
+      DEBUG_PRINT("Braço levantado → resetando finalDisco para permitir novo play");
       finalDisco = false;
     }
   }
-  else if ((tonearmAngle <= 165.0 && tonearmAngle >= 130.0) && !motorLigado)
-  {
-    if (!finalDisco)
-    {
-      DEBUG_PRINT("angulo LIGANDO");
-      toggleMotor(true);
+  // Lógica de DESLIGAR (imediata, sem debounce - segurança primeiro)
+  if (motorLigado && (tonearmAngle > 160.0 || tonearmAngle < 130.0)) {
+    DEBUG_PRINT("angulo DESLIGANDO");
+    toggleMotor(false);
+    
+    if (tonearmAngle < 130.0) {
+      DEBUG_PRINT("FINAL DISCO");
+      finalDisco = true;
     }
+    
+    // Reset debounce ao levantar
+    lowAngleStartTime = 0;
+    debounceLowAngleActive = false;
   }
-  else if (!motorLigado && tonearmAngle > 165)
-  {
-    DEBUG_PRINT("FINAL DISCO OFF");
-    finalDisco = false;
+
+  // Lógica de LIGAR com debounce de 2s (só se ângulo <=160° e >=130° por tempo contínuo)
+  else if (!motorLigado && !finalDisco) {
+    if (tonearmAngle <= 160.0 && tonearmAngle >= 130.0) {
+      if (!debounceLowAngleActive) {
+        // Começa a contar agora
+        lowAngleStartTime = millis();
+        debounceLowAngleActive = true;
+        DEBUG_PRINT("Iniciando debounce: tonearm baixado detectado");
+      }
+      
+      // Verifica se já passou 2s contínuos
+      if (millis() - lowAngleStartTime >= DEBOUNCE_DELAY_MS) {
+        DEBUG_PRINT("Debounce OK - LIGANDO motor após 2s");
+        toggleMotor(true);
+
+        // Reset debounce após ligar
+        lowAngleStartTime = 0;
+        debounceLowAngleActive = false;
+      }
+    } else {
+      // Saiu da faixa → cancela debounce
+      lowAngleStartTime = 0;
+      debounceLowAngleActive = false;
+    }
   }
 
   // unsigned long now = millis();
