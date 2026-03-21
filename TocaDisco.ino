@@ -2,19 +2,21 @@
 #include <WebServer.h>
 #include <ESPmDNS.h>
 #include <ArduinoOTA.h>
-#include <TMCStepper.h>
-#include <ESP32ServoController.h>
+//#include <TMCStepper.h>
+//#include <ESP32ServoController.h>
 #include <ESPTelnet.h>
-#include <Adafruit_NeoPixel.h>
+//#include <Adafruit_NeoPixel.h>
 #include <Wire.h>
 #include "MT6701.hpp"
 #include <Preferences.h>
 
+#define CONFIG_FREERTOS_UNICORE 1
+
 Preferences prefs;
 
 ESPTelnet telnet;
-using namespace MDO::ESP32ServoController;
-ServoController oServo;
+//using namespace MDO::ESP32ServoController;
+//ServoController oServo;
 MT6701 tonearm;
 
 
@@ -32,8 +34,8 @@ const float CLOCK_CORRECTION = 1.012f;  // comece com esse valor e ajuste ±0.00
 #define FULL_STEPS 200
 #define MICROSTEPS 256
 // Pinos UART no ESP32 (half-duplex)
-#define UART_RX_PIN 16
-#define UART_TX_PIN 17
+//#define UART_RX_PIN 20
+//#define UART_TX_PIN 21
 
 // Motor NEMA17 padrão (200 passos/volta)
 #define FULL_STEPS 200
@@ -47,7 +49,7 @@ const float CLOCK_CORRECTION = 1.012f;  // comece com esse valor e ajuste ±0.00
 // #define LED_PIN 38    // Se não funcionar com 48, teste 38 (algumas revisões v1.1)
 #define NUM_LEDS   1
 
-Adafruit_NeoPixel pixels(NUM_LEDS, LED_PIN, NEO_GRB + NEO_KHZ800);
+//Adafruit_NeoPixel pixels(NUM_LEDS, LED_PIN, NEO_GRB + NEO_KHZ800);
 
 bool wifiConectadoAnterior = false;
 
@@ -61,12 +63,14 @@ float rampIncrementPerStep = 0;              // calculado quando inicia rampa
 bool isRamping = false;
 
 // Pinos
-const int pinoDirecao = 1;
-const int pinoPasso = 2;
-const int pinoEnable = 3;
+const int pinoDirecao = 0;
+const int pinoPasso = 1;
+const int pinoEnable = 2;
 
-static const int servoPin = 18;
+static const int servoPin = 10;
 
+static const int tonearmPin_SDA = 8;
+static const int tonearmPin_SCL = 9;
 
 bool motorLigado = false;  // Estado inicial
 bool posicaoLift = true;  // Estado inicial
@@ -80,14 +84,14 @@ unsigned long DEBOUNCE_DELAY_MS = 1500;  // 2 segundos
 bool debounceLowAngleActive = false;      // Flag para rastrear se estamos contando tempo
 
 // Pinos UART para o TMC2209
-#define RXD2 16              // PDN/UART do driver
-#define TXD2 17              // Não usado diretamente, mas necessário para Serial2
+#define RXD2 20              // PDN/UART do driver
+#define TXD2 21              // Não usado diretamente, mas necessário para Serial2
 #define DRIVER_ADDRESS 0b00  // Endereço padrão
 #define R_SENSE 0.11f        // Valor padrão para drivers StepStick
 
 
-HardwareSerial mySerial(2);
-TMC2209Stepper driver(&mySerial, R_SENSE, DRIVER_ADDRESS);
+//HardwareSerial mySerial(2);
+//TMC2209Stepper driver(&mySerial, R_SENSE, DRIVER_ADDRESS);
 
 // Configuração Wifi
 const char* ssid = "SALVATI";
@@ -230,7 +234,7 @@ void toggleMotor( bool ligar = false)
   //   startRampTo(targetRPM,3);
     posicaoServo = posicaoLiftMin;
     //ledcDetachPin(servoPin);
-    oServo.moveTo(posicaoServo, 600, true);
+    //oServo.moveTo(posicaoServo, 600, true);
     posicaoLift = false;
   }
   else
@@ -238,7 +242,7 @@ void toggleMotor( bool ligar = false)
     // desliga motor
     setRPM(0);
     posicaoServo = posicaoLiftMax;
-    oServo.moveTo(posicaoServo, 400, false);
+    //oServo.moveTo(posicaoServo, 400, false);
     posicaoLift = true;
     //delay(4100);  // ou melhor: use um timer não bloqueante
     //ledcDetachPin(servoPin);
@@ -260,7 +264,12 @@ void startRampTo(float newTargetRPM, float accelTimeSeconds = 2.0) {
   lastRampUpdate = millis();
 }
 
+// Versão mínima: força core 0 em todas as pinned tasks
+#define xTaskCreatePinnedToCore(task, name, stack, param, prio, handle, core) \
+    xTaskCreate(task, name, stack, param, prio, handle)
+
 void setup() {
+
   //Serial.begin(115200);  // use Serial normal do ESP32 para debug
 
   // servo
@@ -276,22 +285,22 @@ void setup() {
   //delay(30);  // Espera um frame completo de 50Hz para o servo "travar" na posição
   
   //configure our main settings in the ESP32 LEDC registry
-	Esp32LedcRegistry::instance()->begin(LEDC_CONFIG_ESP32_S3);		//change this for the relevant 
-  BestAvailableFactory oTimerChannelFactory;						//used to select the best available timer & channel based on the hardware setup
-	ServoFactoryDecorator oFactoryDecorator(oTimerChannelFactory);	//let this ServoFactoryDecorator define the servo frequency to use and such
+	//Esp32LedcRegistry::instance()->begin(LEDC_CONFIG_ESP32_C3);		//change this for the relevant 
+  //BestAvailableFactory oTimerChannelFactory;						//used to select the best available timer & channel based on the hardware setup
+	//ServoFactoryDecorator oFactoryDecorator(oTimerChannelFactory);	//let this ServoFactoryDecorator define the servo frequency to use and such
 	//the above two are needed (variable scope related, in 'begin' only)
 	
 	//oServo.moveTo(posicaoServo, 100, true);
-  if (!oServo.begin(oFactoryDecorator, servoPin)) {				//3rd parameter is the default angle to start from: 90 degrees in this case
+  //if (!oServo.begin(oFactoryDecorator, servoPin)) {				//3rd parameter is the default angle to start from: 90 degrees in this case
 		//Serial.println("  failed to init the servo..");
-    pixels.setPixelColor(0, pixels.Color(255, 255, 0));
-    pixels.show();
-		return;
-	}
-  else
-  {
+    //pixels.setPixelColor(0, pixels.Color(255, 255, 0));
+    //pixels.show();
+		//return;
+	//}
+  //else
+  //{
     //oServo.moveTo(posicaoServo, 500, true);  // Movimento rápido de 0.5s para reforçar
-  }
+  //}
 
   // oServo.moveTo(  0.0,  5000, true);							//move to 0 degrees in 5 seconds, and make this a blocking call
   // delay(2000);
@@ -306,29 +315,29 @@ void setup() {
   digitalWrite(pinoDirecao, LOW);
 
 
-  pixels.begin();           // Inicializa o NeoPixel
-  pixels.setBrightness(50); // 0-255, comece baixo para não ofuscar (50 é bom)
-  pixels.clear();           // Apaga o LED no início
-  pixels.setPixelColor(0, pixels.Color(0, 0, 255));  // Blue
-  pixels.show();
+  //pixels.begin();           // Inicializa o NeoPixel
+  //pixels.setBrightness(50); // 0-255, comece baixo para não ofuscar (50 é bom)
+  //pixels.clear();           // Apaga o LED no início
+  //pixels.setPixelColor(0, pixels.Color(0, 0, 255));  // Blue
+  //pixels.show();
 
   // Inicia comunicação UART com o Driver
-  mySerial.begin(115200, SERIAL_8N1, UART_RX_PIN, UART_TX_PIN);
+  //mySerial.begin(115200, SERIAL_8N1, UART_RX_PIN, UART_TX_PIN);
 
 
-  driver.begin();
-  delay(100);
-  driver.toff(4);                // Habilita o driver
-  driver.en_spreadCycle(false);  // DESLIGA SpreadCycle (obrigatório para Stealth)
-  driver.pwm_autoscale(true);    // Ativa StealthChop2
-  driver.pwm_autograd(true);     // Auto-tuning do PWM (ainda mais silencioso)
-  driver.TPWMTHRS(0);            // Fica 100% em StealthChop (sem troca de modo)
-  driver.rms_current(RMS_CURRENT_MA);
-  driver.I_scale_analog(false);  // Usa corrente via UART (não potenciômetro)
+  //driver.begin();
+  //delay(100);
+  //driver.toff(4);                // Habilita o driver
+  //driver.en_spreadCycle(false);  // DESLIGA SpreadCycle (obrigatório para Stealth)
+  //driver.pwm_autoscale(true);    // Ativa StealthChop2
+  //driver.pwm_autograd(true);     // Auto-tuning do PWM (ainda mais silencioso)
+  //driver.TPWMTHRS(0);            // Fica 100% em StealthChop (sem troca de modo)
+  //driver.rms_current(RMS_CURRENT_MA);
+  //driver.I_scale_analog(false);  // Usa corrente via UART (não potenciômetro)
 
   
-  pixels.setPixelColor(0, pixels.Color(255, 0, 255));  // Purple
-  pixels.show();
+  //pixels.setPixelColor(0, pixels.Color(255, 0, 255));  // Purple
+  //pixels.show();
 
   // Configuração OTA
   ArduinoOTA.setHostname("TocaDiscos-Gian");
@@ -364,13 +373,13 @@ void setup() {
   });
   // Rota para Ligar/Desligar o motor
   server.on("/toggle", []() {
-    DEBUG_PRINT("Microstep: " + String(driver.microsteps()));
+    //DEBUG_PRINT("Microstep: " + String(driver.microsteps()));
 
-    if (driver.test_connection()) {
-      DEBUG_PRINT("UART TMC OK!");
-    } else {
-      DEBUG_PRINT("ERRO: TMC não responde via UART!");
-    }
+    //if (driver.test_connection()) {
+    //  DEBUG_PRINT("UART TMC OK!");
+    //} else {
+    //  DEBUG_PRINT("ERRO: TMC não responde via UART!");
+    //}
     
     // No TMC2209: LOW = Ativado, HIGH = Desativado (bobinas soltas)
     //digitalWrite(pinoEnable, motorLigado ? LOW : HIGH);
@@ -384,7 +393,7 @@ void setup() {
       int novaPos = server.arg("pos").toFloat();
       if (novaPos >= posicaoLiftMax && novaPos <= posicaoLiftMin) {
         posicaoServo = novaPos;
-        oServo.moveTo(posicaoServo, 200, true);
+        //oServo.moveTo(posicaoServo, 200, true);
         //lift.write(posicaoServo);        
         // Opcional: atualiza o HTML dinamicamente, mas fetch simples já basta
       }
@@ -466,7 +475,7 @@ void setup() {
   server.on("/status", []() {
     String json = "{";
     json += "\"motorLigado\":" + String(motorLigado ? "true" : "false") + ",";
-    json += "\"tonearmAngle\":" + String(tonearm.getAngleDegrees(), 1) + ",";
+    //json += "\"tonearmAngle\":" + String(tonearm.getAngleDegrees(), 1) + ",";
     json += "\"rpm\":" + String(rpmSelecionado, 1);
     json += "}";
     server.send(200, "application/json", json);
@@ -494,9 +503,9 @@ void setup() {
   // Atualiza posicaoServo inicial com o valor salvo
   posicaoServo = posicaoLiftMax;
 
-  Wire.begin(36, 35); // SDA, SCL
+  //Wire.begin(tonearmPin_SDA,tonearmPin_SCL); // SDA, SCL
   //Wire.setClock(400000);
-  tonearm.begin();
+  //tonearm.begin();
   
 
   //calcularIntervalo();
@@ -517,14 +526,14 @@ void loop() {
 
   if (wifiConectadoAgora && !wifiConectadoAnterior) {
     // WiFi acabou de conectar → acende o LED (ex: verde)
-    pixels.setPixelColor(0, pixels.Color(0, 255, 0));  // Verde (R,G,B)
-    pixels.show();
+    //pixels.setPixelColor(0, pixels.Color(0, 255, 0));  // Verde (R,G,B)
+    //pixels.show();
     //Serial.println("WiFi conectado! LED verde aceso.");
   }
   else if (!wifiConectadoAgora && wifiConectadoAnterior) {
     // WiFi desconectou → apaga ou muda cor (ex: vermelho)
-    pixels.setPixelColor(0, pixels.Color(255, 0, 0));  // Vermelho
-    pixels.show();
+    //pixels.setPixelColor(0, pixels.Color(255, 0, 0));  // Vermelho
+    //pixels.show();
     //Serial.println("WiFi desconectado! LED vermelho.");
   }
   else if (!wifiConectadoAgora) {
@@ -536,7 +545,8 @@ void loop() {
   wifiConectadoAnterior = wifiConectadoAgora;
 
   // acionar o motor conforme o angulo do braço
-  float tonearmAngle = tonearm.getAngleDegrees();
+  //float tonearmAngle = tonearm.getAngleDegrees();
+  float tonearmAngle =  180.0;
   DEBUG_PRINTF("angulo tonearm: %.1f\n", tonearmAngle);  // Mantenha para debug
 
   // Sempre resetar finalDisco quando o braço for levantado (>160°)
@@ -619,7 +629,7 @@ void loop() {
 // Calcula VACTUAL corretamente (fCLK = 12 MHz interno)
 void setRPM(float rpm) {
   if (rpm == 0) {
-    driver.VACTUAL(0);
+    //driver.VACTUAL(0);
     digitalWrite(pinoEnable, HIGH);
     return;
   }
@@ -638,7 +648,7 @@ void setRPM(float rpm) {
   float factor = 16777216.0f / (12000000.0f * CLOCK_CORRECTION);
   int32_t vactual = (int32_t)round(usteps_per_sec * factor);
 
-  driver.VACTUAL(vactual);
+  //driver.VACTUAL(vactual);
   DEBUG_PRINTF("VACTUAL = %ld  (RPM = %.1f)\n", vactual, rpm);
 }
 
@@ -648,7 +658,7 @@ void setRPM(float rpm) {
 // currentRPM = velocidade atual (guarde em uma variável global)
 void accelerateTo(float targetRPM, unsigned long accelTimeMs = 1500) {
   if (targetRPM <= 0) {
-    driver.VACTUAL(0);
+    //driver.VACTUAL(0);
     currentRPM = 0;
     return;
   }
