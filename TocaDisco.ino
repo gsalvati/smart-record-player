@@ -1,23 +1,53 @@
+#include <Arduino.h>
 #include <WiFi.h>
 #include <WebServer.h>
 #include <ESPmDNS.h>
 #include <ArduinoOTA.h>
-//#include <TMCStepper.h>
-//#include <ESP32ServoController.h>
+#include <TMCStepper.h>
 #include <ESPTelnet.h>
 //#include <Adafruit_NeoPixel.h>
+
+
+#if (defined(CONFIG_IDF_TARGET_ESP32C3) || defined(ARDUINO_ESP32C3_DEV)) 
+  // Alternativa: macro que ignora o parâmetro core
+  #define xTaskCreatePinnedToCore(task, name, stack, param, prio, handle, core) \
+    xTaskCreate(task, name, stack, param, prio, handle)
+#endif
+
 #include <Wire.h>
-#include "MT6701.hpp"
 #include <Preferences.h>
+
+#define CONFIG_FREERTOS_UNICORE 1
+
+#if (defined(CONFIG_IDF_TARGET_ESP32C3) || defined(ARDUINO_ESP32C3_DEV))
+  //ESP32-ESP32S2-AnalogWrite
+  // #include <pwmWrite.h>
+  //Pwm oServo = Pwm();
+  #include <ESP32Servo.h>
+  Servo oServo;
+
+  #include <MT6701.h>
+#elif (defined(CONFIG_IDF_TARGET_ESP32S3) || defined(ARDUINO_ESP32S3_DEV))
+  #include <ESP32ServoController.h>  
+  using namespace MDO::ESP32ServoController;
+  ServoController oServo;
+
+  #include "MT6701.hpp"
+
+#elif 0
+  #include <Servo.h>;
+  Servo oServo;
+
+  #include <MT6701.h>
+#endif
 
 #define CONFIG_FREERTOS_UNICORE 1
 
 Preferences prefs;
 
 ESPTelnet telnet;
-//using namespace MDO::ESP32ServoController;
-//ServoController oServo;
 MT6701 tonearm;
+
 
 
 #define DEBUG_PRINT(x) \
@@ -34,18 +64,18 @@ const float CLOCK_CORRECTION = 1.012f;  // comece com esse valor e ajuste ±0.00
 #define FULL_STEPS 200
 #define MICROSTEPS 256
 // Pinos UART no ESP32 (half-duplex)
-//#define UART_RX_PIN 20
-//#define UART_TX_PIN 21
+#define UART_RX_PIN 20
+#define UART_TX_PIN 21
 
 // Motor NEMA17 padrão (200 passos/volta)
 #define FULL_STEPS 200
 #define MICROSTEPS 256
 
 // Corrente RMS (ajuste conforme seu motor - comece baixo!)
-#define RMS_CURRENT_MA 400  // Ex: 400-800mA para NEMA17 comum
+#define RMS_CURRENT_MA 800  // Ex: 400-800mA para NEMA17 comum
 
 // Defina o pino e número de LEDs (geralmente 1 no onboard)
-#define LED_PIN    48    // Tente 48 primeiro (mais comum no N8)
+#define LED_PIN    8    // Tente 48 primeiro (mais comum no N8)
 // #define LED_PIN 38    // Se não funcionar com 48, teste 38 (algumas revisões v1.1)
 #define NUM_LEDS   1
 
@@ -69,8 +99,8 @@ const int pinoEnable = 2;
 
 static const int servoPin = 10;
 
-static const int tonearmPin_SDA = 8;
-static const int tonearmPin_SCL = 9;
+static const int tonearmPin_SDA = 6;
+static const int tonearmPin_SCL = 7;
 
 bool motorLigado = false;  // Estado inicial
 bool posicaoLift = true;  // Estado inicial
@@ -84,14 +114,12 @@ unsigned long DEBOUNCE_DELAY_MS = 1500;  // 2 segundos
 bool debounceLowAngleActive = false;      // Flag para rastrear se estamos contando tempo
 
 // Pinos UART para o TMC2209
-#define RXD2 20              // PDN/UART do driver
-#define TXD2 21              // Não usado diretamente, mas necessário para Serial2
 #define DRIVER_ADDRESS 0b00  // Endereço padrão
 #define R_SENSE 0.11f        // Valor padrão para drivers StepStick
 
 
-//HardwareSerial mySerial(2);
-//TMC2209Stepper driver(&mySerial, R_SENSE, DRIVER_ADDRESS);
+HardwareSerial mySerial(2);
+TMC2209Stepper driver(&mySerial, R_SENSE, DRIVER_ADDRESS);
 
 // Configuração Wifi
 const char* ssid = "SALVATI";
@@ -209,7 +237,7 @@ function updateVisualizer() {
       document.getElementById('platter').style.animationPlayState = data.motorLigado ? 'running' : 'paused';
 
       // Mover o tonearm (ajuste os números conforme seus valores reais do MT6701)
-      const visualAngle = map(data.tonearmAngle, 179, 130, -70, -20);   // ← AJUSTE AQUI se necessário
+      const visualAngle = map(data.tonearmAngle, 179, 125, -70, -20);   // ← AJUSTE AQUI se necessário
       document.getElementById('tonearm').setAttribute('transform', 
         `rotate(${visualAngle} 445 155)`);
     });
@@ -234,7 +262,7 @@ void toggleMotor( bool ligar = false)
   //   startRampTo(targetRPM,3);
     posicaoServo = posicaoLiftMin;
     //ledcDetachPin(servoPin);
-    //oServo.moveTo(posicaoServo, 600, true);
+    moveServo(posicaoServo,600,true);
     posicaoLift = false;
   }
   else
@@ -242,7 +270,7 @@ void toggleMotor( bool ligar = false)
     // desliga motor
     setRPM(0);
     posicaoServo = posicaoLiftMax;
-    //oServo.moveTo(posicaoServo, 400, false);
+    moveServo(posicaoServo,400,false);
     posicaoLift = true;
     //delay(4100);  // ou melhor: use um timer não bloqueante
     //ledcDetachPin(servoPin);
@@ -270,44 +298,36 @@ void startRampTo(float newTargetRPM, float accelTimeSeconds = 2.0) {
 
 void setup() {
 
-  //Serial.begin(115200);  // use Serial normal do ESP32 para debug
+  Serial.begin(115200);  // use Serial normal do ESP32 para debug
 
-  // servo
-  //pinMode(servoPin, OUTPUT);
-  //digitalWrite(servoPin, LOW);  // Começa low para evitar ruído
 
-  // Envie um pulso manual longo para forçar ~90° (ou 180° se preferir) antes da lib
-  // Pulso de 1500 µs = ~90° neutro (ajuste para seu servo: 500=0°, 2500=180°)
-  ///digitalWrite(servoPin, HIGH);
-  //delayMicroseconds(1500);  // ← Para 90°
-  // Ou delayMicroseconds(2500); para 180° se quiser começar lá
-  //digitalWrite(servoPin, LOW);
-  //delay(30);  // Espera um frame completo de 50Hz para o servo "travar" na posição
-  
-  //configure our main settings in the ESP32 LEDC registry
-	//Esp32LedcRegistry::instance()->begin(LEDC_CONFIG_ESP32_C3);		//change this for the relevant 
-  //BestAvailableFactory oTimerChannelFactory;						//used to select the best available timer & channel based on the hardware setup
-	//ServoFactoryDecorator oFactoryDecorator(oTimerChannelFactory);	//let this ServoFactoryDecorator define the servo frequency to use and such
-	//the above two are needed (variable scope related, in 'begin' only)
-	
-	//oServo.moveTo(posicaoServo, 100, true);
-  //if (!oServo.begin(oFactoryDecorator, servoPin)) {				//3rd parameter is the default angle to start from: 90 degrees in this case
-		//Serial.println("  failed to init the servo..");
-    //pixels.setPixelColor(0, pixels.Color(255, 255, 0));
-    //pixels.show();
-		//return;
-	//}
-  //else
-  //{
-    //oServo.moveTo(posicaoServo, 500, true);  // Movimento rápido de 0.5s para reforçar
+  //  if (chipModel == "ESP32-C3") {
+  #if (defined(CONFIG_IDF_TARGET_ESP32C3) || defined(ARDUINO_ESP32C3_DEV))
+      // Runtime logic for C3
+      //oServo.attachServo(servoPin);
+      oServo.attach(servoPin);
+    //} else if (chipModel == "ESP32-S3") {
+  #elif (defined(CONFIG_IDF_TARGET_ESP32S3) || defined(ARDUINO_ESP32S3_DEV)) && 0
+      // Runtime logic for S3
+      //configure our main settings in the ESP32 LEDC registry
+      Esp32LedcRegistry::instance()->begin(LEDC_CONFIG_ESP32_S3);		//change this for the relevant 
+      BestAvailableFactory oTimerChannelFactory;						//used to select the best available timer & channel based on the hardware setup
+      ServoFactoryDecorator oFactoryDecorator(oTimerChannelFactory);	//let this ServoFactoryDecorator define the servo frequency to use and such
+      //the above two are needed (variable scope related, in 'begin' only)
+      
+      //if (!oServo.begin(oFactoryDecorator, servoPin)) {				//3rd parameter is the default angle to start from: 90 degrees in this case
+        //Serial.println("  failed to init the servo..");
+        //pixels.setPixelColor(0, pixels.Color(255, 255, 0));
+        //pixels.show();
+        //return;
+      //}
+    //} else {
+  #elif 0
+    // Handle other models
+    oServo.attach(servoPin);
   //}
-
-  // oServo.moveTo(  0.0,  5000, true);							//move to 0 degrees in 5 seconds, and make this a blocking call
-  // delay(2000);
-
-  // oServo.moveTo(180.0, 10000, true);							//move to 180 degrees in 10 seconds, and make this a blocking call
-  // delay(2000);
-
+  #endif
+  
   pinMode(pinoDirecao, OUTPUT);
   pinMode(pinoPasso, OUTPUT);
   pinMode(pinoEnable, OUTPUT);
@@ -322,18 +342,18 @@ void setup() {
   //pixels.show();
 
   // Inicia comunicação UART com o Driver
-  //mySerial.begin(115200, SERIAL_8N1, UART_RX_PIN, UART_TX_PIN);
+  mySerial.begin(115200, SERIAL_8N1, UART_RX_PIN, UART_TX_PIN);
 
 
-  //driver.begin();
-  //delay(100);
-  //driver.toff(4);                // Habilita o driver
-  //driver.en_spreadCycle(false);  // DESLIGA SpreadCycle (obrigatório para Stealth)
-  //driver.pwm_autoscale(true);    // Ativa StealthChop2
-  //driver.pwm_autograd(true);     // Auto-tuning do PWM (ainda mais silencioso)
-  //driver.TPWMTHRS(0);            // Fica 100% em StealthChop (sem troca de modo)
-  //driver.rms_current(RMS_CURRENT_MA);
-  //driver.I_scale_analog(false);  // Usa corrente via UART (não potenciômetro)
+  driver.begin();
+  delay(100);
+  driver.toff(4);                // Habilita o driver
+  driver.en_spreadCycle(false);  // DESLIGA SpreadCycle (obrigatório para Stealth)
+  driver.pwm_autoscale(true);    // Ativa StealthChop2
+  driver.pwm_autograd(true);     // Auto-tuning do PWM (ainda mais silencioso)
+  driver.TPWMTHRS(0);            // Fica 100% em StealthChop (sem troca de modo)
+  driver.rms_current(RMS_CURRENT_MA);
+  driver.I_scale_analog(false);  // Usa corrente via UART (não potenciômetro)
 
   
   //pixels.setPixelColor(0, pixels.Color(255, 0, 255));  // Purple
@@ -357,7 +377,6 @@ void setup() {
     float r = server.arg("rpm").toFloat();
     if (r < 40) rpmSelecionado = 33.333;
     else rpmSelecionado = 45.0;
-    //calcularIntervalo();
     targetRPM = rpmSelecionado;
     setRPM(targetRPM);
     server.sendHeader("Location", "/");
@@ -373,13 +392,13 @@ void setup() {
   });
   // Rota para Ligar/Desligar o motor
   server.on("/toggle", []() {
-    //DEBUG_PRINT("Microstep: " + String(driver.microsteps()));
+    DEBUG_PRINT("Microstep: " + String(driver.microsteps()));
 
-    //if (driver.test_connection()) {
-    //  DEBUG_PRINT("UART TMC OK!");
-    //} else {
-    //  DEBUG_PRINT("ERRO: TMC não responde via UART!");
-    //}
+    if (driver.test_connection()) {
+      DEBUG_PRINT("UART TMC OK!");
+    } else {
+      DEBUG_PRINT("ERRO: TMC não responde via UART!");
+    }
     
     // No TMC2209: LOW = Ativado, HIGH = Desativado (bobinas soltas)
     //digitalWrite(pinoEnable, motorLigado ? LOW : HIGH);
@@ -393,8 +412,8 @@ void setup() {
       int novaPos = server.arg("pos").toFloat();
       if (novaPos >= posicaoLiftMax && novaPos <= posicaoLiftMin) {
         posicaoServo = novaPos;
-        //oServo.moveTo(posicaoServo, 200, true);
-        //lift.write(posicaoServo);        
+        moveServo(posicaoServo,200,false);
+        
         // Opcional: atualiza o HTML dinamicamente, mas fetch simples já basta
       }
     }
@@ -475,7 +494,16 @@ void setup() {
   server.on("/status", []() {
     String json = "{";
     json += "\"motorLigado\":" + String(motorLigado ? "true" : "false") + ",";
-    //json += "\"tonearmAngle\":" + String(tonearm.getAngleDegrees(), 1) + ",";
+    // acionar o motor conforme o angulo do braço
+    #if (defined(CONFIG_IDF_TARGET_ESP32C3) || defined(ARDUINO_ESP32C3_DEV))    
+      //json += "\"tonearmAngle\":" + String(readMT6701(), 1) + ",";
+      json += "\"tonearmAngle\":" + String(tonearm.angleRead(), 1) + ",";
+    #elif (defined(CONFIG_IDF_TARGET_ESP32S3) || defined(ARDUINO_ESP32S3_DEV)) && 0
+      json += "\"tonearmAngle\":" + String(tonearm.getAngleDegrees(), 1) + ",";
+    #elif 0
+      json += "\"tonearmAngle\":" + String(tonearm.angleRead(), 1) + ",";
+    #endif
+    
     json += "\"rpm\":" + String(rpmSelecionado, 1);
     json += "}";
     server.send(200, "application/json", json);
@@ -502,15 +530,21 @@ void setup() {
 
   // Atualiza posicaoServo inicial com o valor salvo
   posicaoServo = posicaoLiftMax;
+  Serial.println("Início setup - antes de Wire");
 
-  //Wire.begin(tonearmPin_SDA,tonearmPin_SCL); // SDA, SCL
-  //Wire.setClock(400000);
-  //tonearm.begin();
+  Wire.begin(tonearmPin_SDA,tonearmPin_SCL); // SDA, SCL
+  Serial.println("Wire.begin OK");
+  ////Wire.setClock(400000);
   
-
-  //calcularIntervalo();
-
+  #if (defined(CONFIG_IDF_TARGET_ESP32C3) || defined(ARDUINO_ESP32C3_DEV))
+    tonearm.initializeI2C(&Wire);
+  #elif (defined(CONFIG_IDF_TARGET_ESP32S3) || defined(ARDUINO_ESP32S3_DEV))
+    tonearm.begin();
+  #elif 0
+    tonearm.begin();
+  #endif
   
+  Serial.println("tonearm.begin OK");
   //setRPM(targetRPM);
   //accelerateTo(targetRPM,3000);
   //startRampTo(targetRPM,3);
@@ -521,7 +555,7 @@ void loop() {
   ArduinoOTA.handle();
   server.handleClient();
   telnet.loop();  // Mantém o Telnet vivo
-
+/*
   bool wifiConectadoAgora = (WiFi.status() == WL_CONNECTED);
 
   if (wifiConectadoAgora && !wifiConectadoAnterior) {
@@ -543,10 +577,20 @@ void loop() {
   }
 
   wifiConectadoAnterior = wifiConectadoAgora;
+*/
 
   // acionar o motor conforme o angulo do braço
-  //float tonearmAngle = tonearm.getAngleDegrees();
-  float tonearmAngle =  180.0;
+  #if (defined(CONFIG_IDF_TARGET_ESP32C3) || defined(ARDUINO_ESP32C3_DEV))    
+    //float tonearmAngle = readMT6701();
+    float tonearmAngle = tonearm.angleRead();
+    //tonearmAngle = 155;
+  #elif (defined(CONFIG_IDF_TARGET_ESP32S3) || defined(ARDUINO_ESP32S3_DEV))
+    float tonearmAngle = tonearm.getAngleDegrees();
+  #elif 0
+    float tonearmAngle = tonearm.angleRead();
+  #endif
+  
+  //float tonearmAngle =  180.0;
   DEBUG_PRINTF("angulo tonearm: %.1f\n", tonearmAngle);  // Mantenha para debug
 
   // Sempre resetar finalDisco quando o braço for levantado (>160°)
@@ -558,11 +602,11 @@ void loop() {
     }
   }
   // Lógica de DESLIGAR (imediata, sem debounce - segurança primeiro)
-  if (motorLigado && (tonearmAngle > 160.0 || tonearmAngle < 130.0)) {
+  if (motorLigado && (tonearmAngle > 160.0 || tonearmAngle < 125.0)) {
     DEBUG_PRINT("angulo DESLIGANDO");
     toggleMotor(false);
     
-    if (tonearmAngle < 130.0) {
+    if (tonearmAngle < 125.0) {
       DEBUG_PRINT("FINAL DISCO");
       finalDisco = true;
     }
@@ -572,9 +616,9 @@ void loop() {
     debounceLowAngleActive = false;
   }
 
-  // Lógica de LIGAR com debounce de 2s (só se ângulo <=160° e >=130° por tempo contínuo)
+  // Lógica de LIGAR com debounce de 2s (só se ângulo <=160° e >=125° por tempo contínuo)
   else if (!motorLigado && !finalDisco) {
-    if (tonearmAngle <= 160.0 && tonearmAngle >= 130.0) {
+    if (tonearmAngle <= 160.0 && tonearmAngle >= 125.0) {
       if (!debounceLowAngleActive) {
         // Começa a contar agora
         lowAngleStartTime = millis();
@@ -629,7 +673,7 @@ void loop() {
 // Calcula VACTUAL corretamente (fCLK = 12 MHz interno)
 void setRPM(float rpm) {
   if (rpm == 0) {
-    //driver.VACTUAL(0);
+    driver.VACTUAL(0);
     digitalWrite(pinoEnable, HIGH);
     return;
   }
@@ -648,7 +692,7 @@ void setRPM(float rpm) {
   float factor = 16777216.0f / (12000000.0f * CLOCK_CORRECTION);
   int32_t vactual = (int32_t)round(usteps_per_sec * factor);
 
-  //driver.VACTUAL(vactual);
+  driver.VACTUAL(vactual);
   DEBUG_PRINTF("VACTUAL = %ld  (RPM = %.1f)\n", vactual, rpm);
 }
 
@@ -658,12 +702,10 @@ void setRPM(float rpm) {
 // currentRPM = velocidade atual (guarde em uma variável global)
 void accelerateTo(float targetRPM, unsigned long accelTimeMs = 1500) {
   if (targetRPM <= 0) {
-    //driver.VACTUAL(0);
+    driver.VACTUAL(0);
     currentRPM = 0;
     return;
   }
-
-
 
   float startRPM = currentRPM;  // começa de onde está
   if (startRPM < 0) startRPM = 0;
@@ -684,4 +726,37 @@ void accelerateTo(float targetRPM, unsigned long accelTimeMs = 1500) {
 
   currentRPM = targetRPM;     // atualiza a variável global
   setRPM(targetRPM);          // garante o valor final exato
+}
+
+void moveServo(float angle, unsigned long time, bool hold) {
+  //if (chipModel == "ESP32-C3") {
+  #if (defined(CONFIG_IDF_TARGET_ESP32C3) || defined(ARDUINO_ESP32C3_DEV))
+
+    // Runtime logic for C3
+    //oServo.write(posicaoServo, time);        
+    oServo.write(posicaoServo);        
+  //} else if (chipModel == "ESP32-S3") {
+  #elif (defined(CONFIG_IDF_TARGET_ESP32S3) || defined(ARDUINO_ESP32S3_DEV))
+    // Runtime logic for S3
+    oServo.moveTo(angle, time, hold);
+  //} else {
+  #elif 0
+    // Handle other models
+    oServo.write(servoPin, angle);        
+  //}
+  #endif
+}
+
+float readMT6701() {
+  Wire.beginTransmission(0x06);  // Endereço típico MT6701
+  Wire.write(0x03);             // Registrador MSB ângulo
+  Wire.endTransmission(false);
+  Wire.requestFrom(0x06, 2);
+  DEBUG_PRINTF("Wire.available() %.1f\n", Wire.available());  // Mantenha para debug
+  if (Wire.available() >= 2) {
+    
+    uint16_t raw = (Wire.read() << 8) | Wire.read();
+    return (raw * 360.0f) / 16384.0f;  // 14-bit para graus
+  }
+  return -1;
 }
