@@ -1,4 +1,4 @@
-#include <Arduino.h>
+//#include <Arduino.h>
 #include <WiFi.h>
 #include <WebServer.h>
 #include <ESPmDNS.h>
@@ -48,8 +48,6 @@ Preferences prefs;
 ESPTelnet telnet;
 MT6701 tonearm;
 
-
-
 #define DEBUG_PRINT(x) \
   do { \    
     telnet.println(x); \
@@ -59,20 +57,6 @@ MT6701 tonearm;
     telnet.printf(__VA_ARGS__); \
   } while (0)
 
-const float CLOCK_CORRECTION = 1.012f;  // comece com esse valor e ajuste ±0.001 até bater exato
-// Motor NEMA17 padrão (200 passos/volta)
-#define FULL_STEPS 200
-#define MICROSTEPS 256
-// Pinos UART no ESP32 (half-duplex)
-#define UART_RX_PIN 20
-#define UART_TX_PIN 21
-
-// Motor NEMA17 padrão (200 passos/volta)
-#define FULL_STEPS 200
-#define MICROSTEPS 256
-
-// Corrente RMS (ajuste conforme seu motor - comece baixo!)
-#define RMS_CURRENT_MA 800  // Ex: 400-800mA para NEMA17 comum
 
 // Defina o pino e número de LEDs (geralmente 1 no onboard)
 #define LED_PIN    8    // Tente 48 primeiro (mais comum no N8)
@@ -92,10 +76,6 @@ const unsigned long RAMP_INTERVAL_MS = 20;   // atualiza a cada 20 ms
 float rampIncrementPerStep = 0;              // calculado quando inicia rampa
 bool isRamping = false;
 
-// Pinos
-const int pinoDirecao = 0;
-const int pinoPasso = 1;
-const int pinoEnable = 2;
 
 static const int servoPin = 10;
 
@@ -113,12 +93,29 @@ unsigned long lowAngleStartTime = 0;      // Timestamp quando ângulo primeiro <
 unsigned long DEBOUNCE_DELAY_MS = 1500;  // 2 segundos
 bool debounceLowAngleActive = false;      // Flag para rastrear se estamos contando tempo
 
+// STEPPER MOTOR
+
+const float CLOCK_CORRECTION = 1.012f;  // comece com esse valor e ajuste ±0.001 até bater exato
+// Motor NEMA17 padrão (200 passos/volta)
+#define FULL_STEPS 200
+#define MICROSTEPS 256
+// Pinos UART no ESP32 (half-duplex)
+#define UART_RX_PIN 5
+#define UART_TX_PIN 4
+
+// Corrente RMS (ajuste conforme seu motor - comece baixo!)
+#define RMS_CURRENT_MA 400  // Ex: 400-800mA para NEMA17 comum
+
 // Pinos UART para o TMC2209
 #define DRIVER_ADDRESS 0b00  // Endereço padrão
 #define R_SENSE 0.11f        // Valor padrão para drivers StepStick
 
+// Pinos
+const int pinoDirecao = 0;
+const int pinoPasso = 1;
+const int pinoEnable = 2;
 
-HardwareSerial mySerial(2);
+HardwareSerial mySerial(1);
 TMC2209Stepper driver(&mySerial, R_SENSE, DRIVER_ADDRESS);
 
 // Configuração Wifi
@@ -292,21 +289,13 @@ void startRampTo(float newTargetRPM, float accelTimeSeconds = 2.0) {
   lastRampUpdate = millis();
 }
 
-// Versão mínima: força core 0 em todas as pinned tasks
-#define xTaskCreatePinnedToCore(task, name, stack, param, prio, handle, core) \
-    xTaskCreate(task, name, stack, param, prio, handle)
-
 void setup() {
 
   Serial.begin(115200);  // use Serial normal do ESP32 para debug
 
-
-  //  if (chipModel == "ESP32-C3") {
   #if (defined(CONFIG_IDF_TARGET_ESP32C3) || defined(ARDUINO_ESP32C3_DEV))
       // Runtime logic for C3
-      //oServo.attachServo(servoPin);
       oServo.attach(servoPin);
-    //} else if (chipModel == "ESP32-S3") {
   #elif (defined(CONFIG_IDF_TARGET_ESP32S3) || defined(ARDUINO_ESP32S3_DEV)) && 0
       // Runtime logic for S3
       //configure our main settings in the ESP32 LEDC registry
@@ -321,11 +310,9 @@ void setup() {
         //pixels.show();
         //return;
       //}
-    //} else {
   #elif 0
     // Handle other models
     oServo.attach(servoPin);
-  //}
   #endif
   
   pinMode(pinoDirecao, OUTPUT);
@@ -353,9 +340,21 @@ void setup() {
   driver.pwm_autograd(true);     // Auto-tuning do PWM (ainda mais silencioso)
   driver.TPWMTHRS(0);            // Fica 100% em StealthChop (sem troca de modo)
   driver.rms_current(RMS_CURRENT_MA);
+  //driver.mstep_reg_select(1);  // necessary for TMC2208 to set microstep register with UART
+  //driver.microsteps(256); 
   driver.I_scale_analog(false);  // Usa corrente via UART (não potenciômetro)
 
+  uint32_t v = 0;
+  int8_t result = driver.test_connection();
   
+  if (result == 0) {
+    DEBUG_PRINT("SUCESSO: UART comunicando!");
+    Serial.print("SUCESSO: UART comunicando!");
+  } else {
+    DEBUG_PRINTF("ERRO: Falha na comunicação (Código: %d)\n", result);
+    Serial.printf("ERRO: Falha na comunicação (Código: %d)\n", result);
+    DEBUG_PRINT("Verifique: 1. Alimentação VMOT (12V) ligada? 2. Resistor de 1k? 3. Pinos TX/RX invertidos?");
+  }
   //pixels.setPixelColor(0, pixels.Color(255, 0, 255));  // Purple
   //pixels.show();
 
@@ -394,13 +393,6 @@ void setup() {
   server.on("/toggle", []() {
     DEBUG_PRINT("Microstep: " + String(driver.microsteps()));
 
-    if (driver.test_connection()) {
-      DEBUG_PRINT("UART TMC OK!");
-    } else {
-      DEBUG_PRINT("ERRO: TMC não responde via UART!");
-    }
-    
-    // No TMC2209: LOW = Ativado, HIGH = Desativado (bobinas soltas)
     //digitalWrite(pinoEnable, motorLigado ? LOW : HIGH);
     toggleMotor(!motorLigado);
 
@@ -496,7 +488,6 @@ void setup() {
     json += "\"motorLigado\":" + String(motorLigado ? "true" : "false") + ",";
     // acionar o motor conforme o angulo do braço
     #if (defined(CONFIG_IDF_TARGET_ESP32C3) || defined(ARDUINO_ESP32C3_DEV))    
-      //json += "\"tonearmAngle\":" + String(readMT6701(), 1) + ",";
       json += "\"tonearmAngle\":" + String(tonearm.angleRead(), 1) + ",";
     #elif (defined(CONFIG_IDF_TARGET_ESP32S3) || defined(ARDUINO_ESP32S3_DEV)) && 0
       json += "\"tonearmAngle\":" + String(tonearm.getAngleDegrees(), 1) + ",";
@@ -530,10 +521,10 @@ void setup() {
 
   // Atualiza posicaoServo inicial com o valor salvo
   posicaoServo = posicaoLiftMax;
-  Serial.println("Início setup - antes de Wire");
+  //Serial.println("Início setup - antes de Wire");
 
   Wire.begin(tonearmPin_SDA,tonearmPin_SCL); // SDA, SCL
-  Serial.println("Wire.begin OK");
+  //Serial.println("Wire.begin OK");
   ////Wire.setClock(400000);
   
   #if (defined(CONFIG_IDF_TARGET_ESP32C3) || defined(ARDUINO_ESP32C3_DEV))
@@ -544,7 +535,7 @@ void setup() {
     tonearm.begin();
   #endif
   
-  Serial.println("tonearm.begin OK");
+  //Serial.println("tonearm.begin OK");
   //setRPM(targetRPM);
   //accelerateTo(targetRPM,3000);
   //startRampTo(targetRPM,3);
@@ -581,17 +572,14 @@ void loop() {
 
   // acionar o motor conforme o angulo do braço
   #if (defined(CONFIG_IDF_TARGET_ESP32C3) || defined(ARDUINO_ESP32C3_DEV))    
-    //float tonearmAngle = readMT6701();
     float tonearmAngle = tonearm.angleRead();
-    //tonearmAngle = 155;
   #elif (defined(CONFIG_IDF_TARGET_ESP32S3) || defined(ARDUINO_ESP32S3_DEV))
     float tonearmAngle = tonearm.getAngleDegrees();
   #elif 0
     float tonearmAngle = tonearm.angleRead();
   #endif
   
-  //float tonearmAngle =  180.0;
-  DEBUG_PRINTF("angulo tonearm: %.1f\n", tonearmAngle);  // Mantenha para debug
+  //DEBUG_PRINTF("angulo tonearm: %.1f\n", tonearmAngle);  // Mantenha para debug
 
   // Sempre resetar finalDisco quando o braço for levantado (>160°)
   // Isso permite religar depois de um "fim de disco" se o usuário levantar e abaixar novamente
@@ -667,6 +655,11 @@ void loop() {
   //   DEBUG_PRINTF("graus: %.1ff\n",posicaoServo);
   //   delay(20);
   // }
+
+  //driver.microsteps(32);   
+  //uint16_t msread=driver.microsteps();
+  //DEBUG_PRINT(" read:ms=");  
+  //DEBUG_PRINT(msread); 
 }
 
 // ===================== FUNÇÃO DE RPM =====================
@@ -759,4 +752,10 @@ float readMT6701() {
     return (raw * 360.0f) / 16384.0f;  // 14-bit para graus
   }
   return -1;
+}
+
+void turn() {
+  for(int i=0;i<=6400 ;i++) {
+     digitalWrite(pinoPasso, !digitalRead(pinoPasso));
+     delayMicroseconds(400); }
 }
