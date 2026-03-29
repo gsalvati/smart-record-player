@@ -104,7 +104,7 @@ const float CLOCK_CORRECTION = 1.012f;  // comece com esse valor e ajuste ±0.00
 #define UART_TX_PIN 4
 
 // Corrente RMS (ajuste conforme seu motor - comece baixo!)
-#define RMS_CURRENT_MA 400  // Ex: 400-800mA para NEMA17 comum
+#define RMS_CURRENT_MA 800  // Ex: 400-800mA para NEMA17 comum
 
 // Pinos UART para o TMC2209
 #define DRIVER_ADDRESS 0b00  // Endereço padrão
@@ -250,8 +250,18 @@ setInterval(updateVisualizer, 180);
 }
 
 void toggleMotor( bool ligar = false)
-{
-
+{  
+  int8_t result = driver.test_connection();
+  
+  if (result == 0) {
+    DEBUG_PRINT("SUCESSO: UART comunicando!");
+    Serial.print("SUCESSO: UART comunicando!");    
+  } else {
+    DEBUG_PRINTF("ERRO: Falha na comunicação (Código: %d)\n", result);
+    Serial.printf("ERRO: Falha na comunicação (Código: %d)\n", result);
+    DEBUG_PRINT("Verifique: 1. Alimentação VMOT (12V) ligada? 2. Resistor de 1k? 3. Pinos TX/RX invertidos?");
+    digitalWrite(pinoEnable, HIGH);
+  }
   if (ligar)
   {
     // liga motor
@@ -320,6 +330,7 @@ void setup() {
   pinMode(pinoEnable, OUTPUT);
 
   digitalWrite(pinoDirecao, LOW);
+  //digitalWrite(pinoPasso, LOW);
 
 
   //pixels.begin();           // Inicializa o NeoPixel
@@ -333,7 +344,7 @@ void setup() {
 
 
   driver.begin();
-  delay(100);
+  delay(200);
   driver.toff(4);                // Habilita o driver
   driver.en_spreadCycle(false);  // DESLIGA SpreadCycle (obrigatório para Stealth)
   driver.pwm_autoscale(true);    // Ativa StealthChop2
@@ -343,17 +354,17 @@ void setup() {
   //driver.mstep_reg_select(1);  // necessary for TMC2208 to set microstep register with UART
   //driver.microsteps(256); 
   driver.I_scale_analog(false);  // Usa corrente via UART (não potenciômetro)
-
-  uint32_t v = 0;
+  
   int8_t result = driver.test_connection();
   
   if (result == 0) {
     DEBUG_PRINT("SUCESSO: UART comunicando!");
-    Serial.print("SUCESSO: UART comunicando!");
+    Serial.print("SUCESSO: UART comunicando!");    
   } else {
     DEBUG_PRINTF("ERRO: Falha na comunicação (Código: %d)\n", result);
     Serial.printf("ERRO: Falha na comunicação (Código: %d)\n", result);
     DEBUG_PRINT("Verifique: 1. Alimentação VMOT (12V) ligada? 2. Resistor de 1k? 3. Pinos TX/RX invertidos?");
+    digitalWrite(pinoEnable, HIGH);
   }
   //pixels.setPixelColor(0, pixels.Color(255, 0, 255));  // Purple
   //pixels.show();
@@ -738,24 +749,4 @@ void moveServo(float angle, unsigned long time, bool hold) {
     oServo.write(servoPin, angle);        
   //}
   #endif
-}
-
-float readMT6701() {
-  Wire.beginTransmission(0x06);  // Endereço típico MT6701
-  Wire.write(0x03);             // Registrador MSB ângulo
-  Wire.endTransmission(false);
-  Wire.requestFrom(0x06, 2);
-  DEBUG_PRINTF("Wire.available() %.1f\n", Wire.available());  // Mantenha para debug
-  if (Wire.available() >= 2) {
-    
-    uint16_t raw = (Wire.read() << 8) | Wire.read();
-    return (raw * 360.0f) / 16384.0f;  // 14-bit para graus
-  }
-  return -1;
-}
-
-void turn() {
-  for(int i=0;i<=6400 ;i++) {
-     digitalWrite(pinoPasso, !digitalRead(pinoPasso));
-     delayMicroseconds(400); }
 }
