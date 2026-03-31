@@ -98,7 +98,7 @@ bool debounceLowAngleActive = false;      // Flag para rastrear se estamos conta
 const float CLOCK_CORRECTION = 1.012f;  // comece com esse valor e ajuste ±0.001 até bater exato
 // Motor NEMA17 padrão (200 passos/volta)
 #define FULL_STEPS 200
-#define MICROSTEPS 256
+#define MICROSTEPS 64
 // Pinos UART no ESP32 (half-duplex)
 #define UART_RX_PIN 5
 #define UART_TX_PIN 4
@@ -111,8 +111,8 @@ const float CLOCK_CORRECTION = 1.012f;  // comece com esse valor e ajuste ±0.00
 #define R_SENSE 0.11f        // Valor padrão para drivers StepStick
 
 // Pinos
-const int pinoDirecao = 0;
-const int pinoPasso = 1;
+//const int pinoDirecao = 0;
+//const int pinoPasso = 1;
 const int pinoEnable = 2;
 
 HardwareSerial mySerial(1);
@@ -264,21 +264,34 @@ void toggleMotor( bool ligar = false)
   }
   if (ligar)
   {
-    // liga motor
-    setRPM(targetRPM);
-  //   startRampTo(targetRPM,3);
+    //startRampTo(targetRPM,3);
     posicaoServo = posicaoLiftMin;
     //ledcDetachPin(servoPin);
     moveServo(posicaoServo,600,true);
     posicaoLift = false;
+
+    // liga motor
+    driver.rms_current(1000); // 1000mA (limite do seu motor)
+    
+    setRPM(targetRPM);
+    
+    // 2. Espera o prato vencer a inércia (ex: 2 segundos)
+    // Nota: Em um código profissional, usaríamos um timer não bloqueante, 
+    // mas para teste inicial o delay resolve:
+    delay(2000); 
+    
+    // 3. Volta para a corrente de cruzeiro para não esquentar o motor
+    driver.rms_current(RMS_CURRENT_MA); // Volta para os 800mA
+    
   }
   else
   {
-    // desliga motor
-    setRPM(0);
     posicaoServo = posicaoLiftMax;
     moveServo(posicaoServo,400,false);
     posicaoLift = true;
+
+    // desliga motor
+    setRPM(0);    
     //delay(4100);  // ou melhor: use um timer não bloqueante
     //ledcDetachPin(servoPin);
   }
@@ -325,11 +338,12 @@ void setup() {
     oServo.attach(servoPin);
   #endif
   
-  pinMode(pinoDirecao, OUTPUT);
-  pinMode(pinoPasso, OUTPUT);
+  //pinMode(pinoDirecao, OUTPUT);
+  //pinMode(pinoPasso, OUTPUT);
   pinMode(pinoEnable, OUTPUT);
 
-  digitalWrite(pinoDirecao, LOW);
+  //digitalWrite(pinoDirecao, LOW);
+  digitalWrite(pinoEnable, HIGH); // deixar desligado
   //digitalWrite(pinoPasso, LOW);
 
 
@@ -352,7 +366,7 @@ void setup() {
   driver.TPWMTHRS(0);            // Fica 100% em StealthChop (sem troca de modo)
   driver.rms_current(RMS_CURRENT_MA);
   //driver.mstep_reg_select(1);  // necessary for TMC2208 to set microstep register with UART
-  //driver.microsteps(256); 
+  driver.microsteps(MICROSTEPS); 
   driver.I_scale_analog(false);  // Usa corrente via UART (não potenciômetro)
   
   int8_t result = driver.test_connection();
@@ -641,31 +655,7 @@ void loop() {
     }
   }
 
-  // unsigned long now = millis();
-
-  // if (isRamping && (now - lastRampUpdate >= RAMP_INTERVAL_MS)) {
-  //   currentRPM += rampIncrementPerStep;
-    
-  //   // Chegou no alvo (ou passou um pouquinho)?
-  //   if ((rampIncrementPerStep > 0 && currentRPM >= targetRPMSet) ||
-  //       (rampIncrementPerStep < 0 && currentRPM <= targetRPMSet)) {
-  //     currentRPM = targetRPMSet;
-  //     isRamping = false;
-  //   }
-    
-  //   setRPM(currentRPM);
-  //   lastRampUpdate = now;
-  // }
-  // // for (int posicaoServo = 0; posicaoServo <= 15; posicaoServo++) {
-  // //   lift.write(posicaoServo);
-  //   DEBUG_PRINTF("graus: %.1ff\n",posicaoServo);
-  //   delay(20);
-  // }
-  // for (int posicaoServo = 15; posicaoServo >= 0; posicaoServo--) {
-  //   lift.write(posicaoServo);
-  //   DEBUG_PRINTF("graus: %.1ff\n",posicaoServo);
-  //   delay(20);
-  // }
+  checkThermalStatus();
 
   //driver.microsteps(32);   
   //uint16_t msread=driver.microsteps();
@@ -749,4 +739,18 @@ void moveServo(float angle, unsigned long time, bool hold) {
     oServo.write(servoPin, angle);        
   //}
   #endif
+}
+
+void checkThermalStatus() {
+    uint32_t drv_status = driver.DRV_STATUS();
+    
+    // otpw: Over Temperature Pre-Warning (~120°C)
+    if (driver.otpw()) {
+        DEBUG_PRINT("ALERTA: Driver atingiu 120°C! Considere reduzir a corrente.");
+    }
+
+    // ot: Over Temperature Critical (~150°C)
+    if (driver.ot()) {
+        DEBUG_PRINT("ERRO: Driver desligado por superaquecimento!");
+    }
 }
