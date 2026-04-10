@@ -98,7 +98,7 @@ bool debounceLowAngleActive = false;      // Flag para rastrear se estamos conta
 const float CLOCK_CORRECTION = 1.012f;  // comece com esse valor e ajuste ±0.001 até bater exato
 // Motor NEMA17 padrão (200 passos/volta)
 #define FULL_STEPS 200
-#define MICROSTEPS 64
+#define MICROSTEPS 256
 // Pinos UART no ESP32 (half-duplex)
 #define UART_RX_PIN 5
 #define UART_TX_PIN 4
@@ -137,7 +137,7 @@ void handleRoot() {
   String corBotao = motorLigado ? "#e74c3c" : "#2ecc71";
   String textoBotao = motorLigado ? "DESLIGAR MOTOR" : "LIGAR MOTOR";
 
-  String html = "<html><head><meta name='viewport' content='width=device-width, initial-scale=1.0'>";
+  String html = "<html charset='utf-8'><head><meta name='viewport' content='width=device-width, initial-scale=1.0'>";
   html += "<style>body{font-family:sans-serif; text-align:center; background:#121212; color:white;} .slider{width:80%; margin:20px;} .btn{padding:15px 30px; margin:10px; font-size:18px; cursor:pointer; border:none; border-radius:5px;} .btn-toggle{background:" + corBotao + "; color:white; width:80%; font-weight:bold;}</style></head>";
   html += "<body><h1>Toca-Discos Gian</h1>";
   // Botão de Power
@@ -198,8 +198,8 @@ void handleRoot() {
 )=====";
   html += "</div>";
 
-  html += "<h3>Ajuste Fino (" + String(rpmSelecionado) + " RPM)</h3>";
-  html += "<input type='range' min='0.70' max='1.30' step='0.002' value='" + String(rpmSelecionado > 40 ? ajusteFino45 : ajusteFino33) + "' class='slider' onchange=\"fetch('/ajuste?val='+this.value)\">";
+//  html += "<h3>Ajuste Fino (" + String(rpmSelecionado) + " RPM)</h3>";
+//  html += "<input type='range' min='0.70' max='1.30' step='0.002' value='" + String(rpmSelecionado > 40 ? ajusteFino45 : ajusteFino33) + "' class='slider' onchange=\"fetch('/ajuste?val='+this.value)\">";
   html += "<h3>Controle do Servo ("+String(posicaoLiftMax)+"-"+String(posicaoLiftMin)+"°)</h3>";
   html += "<input type='range' min='"+String(posicaoLiftMax)+"' max='"+String(posicaoLiftMin)+"' value='" + String(posicaoServo) + "' class='slider' onchange=\"fetch('/servo?pos='+this.value)\">";
   html += "<p>Posição atual: <span id='pos'>" + String(posicaoServo) + "</span>°</p>";
