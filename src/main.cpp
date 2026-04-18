@@ -220,14 +220,77 @@ void accelerateTo(float targetRPM, unsigned long accelTimeMs = 1500) {
   setRPM(targetRPM);          // garante o valor final exato
 }
 
+void handleManifest() {
+  String manifest = R"=====({
+  "name": "Toca-Discos",
+  "short_name": "Toca-Discos",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#121212",
+  "theme_color": "#121212",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3e%3ccircle cx='50' cy='50' r='45' fill='%23333'/%3e%3ccircle cx='50' cy='50' r='35' fill='%23111'/%3e%3ctext x='50' y='55' text-anchor='middle' fill='%23aaa' font-size='20'%3eGIAN%3c/text%3e%3c/svg%3e",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    }
+  ]
+})=====";
+  server.send(200, "application/json", manifest);
+}
+
+void handleServiceWorker() {
+  String sw = R"=====(
+const CACHE_NAME = 'tocadiscos-v1';
+const urlsToCache = [
+  '/',
+  '/manifest.json'
+];
+
+self.addEventListener('install', event => {
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then(cache => cache.addAll(urlsToCache))
+  );
+});
+
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys().then(cacheNames => {
+      return Promise.all(
+        cacheNames.map(cacheName => {
+          if (cacheName !== CACHE_NAME) {
+            return caches.delete(cacheName);
+          }
+        })
+      );
+    })
+  );
+});
+
+self.addEventListener('fetch', event => {
+  event.respondWith(
+    caches.match(event.request)
+      .then(response => {
+        if (response) {
+          return response;
+        }
+        return fetch(event.request);
+      })
+  );
+});
+)=====";
+  server.send(200, "application/javascript", sw);
+}
+
 // Interface Web (HTML/JavaScript)
 void handleRoot() {
   String corBotao = motorLigado ? "#e74c3c" : "#2ecc71";
   String textoBotao = motorLigado ? "DESLIGAR MOTOR" : "LIGAR MOTOR";
 
-  String html = "<html charset='utf-8'><head><meta name='viewport' content='width=device-width, initial-scale=1.0'>";
+  String html = "<html charset='utf-8'><head><meta name='viewport' content='width=device-width, initial-scale=1.0'><link rel='manifest' href='/manifest.json'>";
   html += "<style>body{font-family:sans-serif; text-align:center; background:#121212; color:white;} .slider{width:80%; margin:20px;} .btn{padding:15px 30px; margin:10px; font-size:18px; cursor:pointer; border:none; border-radius:5px;} .btn-toggle{background:" + corBotao + "; color:white; width:80%; font-weight:bold;}</style></head>";
-  html += "<body><h1>Toca-Discos Gian</h1>";
+  html += "<body><h1>Toca-Discos</h1>";
   // Botão de Power
   html += "<button class='btn btn-toggle' onclick=\"location.href='/toggle'\">" + textoBotao + "</button><br><br>";
 
@@ -330,6 +393,12 @@ function updateVisualizer() {
 
 // Atualiza a cada 180ms (suave e leve)
 setInterval(updateVisualizer, 180);
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js')
+    .then(reg => console.log('SW registered'))
+    .catch(err => console.log('SW registration failed'));
+}
 </script>
 )=====";
 
@@ -496,6 +565,8 @@ void setup() {
   MDNS.begin("tocadiscos");
 
   // Rotas do Servidor
+  server.on("/manifest.json", handleManifest);
+  server.on("/sw.js", handleServiceWorker);
   server.on("/", handleRoot);
   server.on("/set", []() {
     float r = server.arg("rpm").toFloat();
@@ -542,7 +613,7 @@ void setup() {
     String html = "<html><head><meta name='viewport' content='width=device-width, initial-scale=1.0'>";
     html += "<style>body{font-family:sans-serif; text-align:center; background:#121212; color:white;}";
     html += "input, button{margin:10px; padding:10px; font-size:16px; width:80%; max-width:400px;}</style></head>";
-    html += "<body><h1>Configurações do Toca-Discos Gian</h1>";
+    html += "<body><h1>Configurações do Toca-Discos</h1>";
 
     html += "<h3>Posição Servo Levantado (liftMax)</h3>";
     html += "<input type='number' id='liftMax' step='0.1' value='" + String(posicaoLiftMax, 1) + "'>";
