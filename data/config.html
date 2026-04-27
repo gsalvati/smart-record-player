@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configurações - Toca-Discos</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <h1>Configurações do Toca-Discos</h1>
+
+    <h3>Posição Servo Levantado (liftMax)</h3>
+    <input type="number" id="liftMax" step="0.1" value="80.0">
+
+    <h3>Posição Servo Baixado (liftMin)</h3>
+    <input type="number" id="liftMin" step="0.1" value="120.0">
+
+    <h3>Tempo para ligar motor (debounce em segundos)</h3>
+    <input type="number" id="debounceSec" step="0.1" min="0.5" max="10" value="2.0">
+
+    <br><br>
+    <button class="btn btn-config" onclick="salvar()">SALVAR CONFIGURAÇÕES</button>
+    <br><br>
+    <button class="btn" style="background:#444; color:white;" onclick="location.href='/'">VOLTAR</button>
+    <p id="status"></p>
+
+    <script>
+        fetch('/get_config').then(r => r.json()).then(data => {
+            if(data.liftMax !== undefined) document.getElementById('liftMax').value = data.liftMax;
+            if(data.liftMin !== undefined) document.getElementById('liftMin').value = data.liftMin;
+            if(data.debounceSec !== undefined) document.getElementById('debounceSec').value = data.debounceSec;
+        });
+
+        function salvar() {
+            let liftMax = document.getElementById('liftMax').value;
+            let liftMin = document.getElementById('liftMin').value;
+            let debounceSec = document.getElementById('debounceSec').value;
+            fetch('/salvar?liftMax=' + liftMax + '&liftMin=' + liftMin + '&debounce=' + debounceSec)
+              .then(r => r.text()).then(txt => {
+                  document.getElementById('status').innerText = txt;
+              });
+        }
+    </script>
+</body>
+</html>
