@@ -1,4 +1,5 @@
 let socket;
+let isManual = false;
 
 function initWebSocket() {
     socket = new WebSocket(`ws://${window.location.hostname}:81/`);
@@ -27,6 +28,19 @@ function map(val, inMin, inMax, outMin, outMax) {
 }
 
 function updateUI(data) {
+    // Atualiza estado do botão Operação
+    const btnOper = document.getElementById("btnOper");
+    if (btnOper && data.manualOp !== undefined) {
+        isManual = data.manualOp;
+        if (isManual) {
+            btnOper.innerText = "Modo: MANUAL";
+            btnOper.style.background = "#e67e22"; // Laranja para manual
+        } else {
+            btnOper.innerText = "Modo: AUTOMÁTICO";
+            btnOper.style.background = "#555"; // Cinza para automático
+        }
+    }
+
     // Atualizar botão de Power
     const btnToggle = document.getElementById("btnToggle");
     if (btnToggle) {
@@ -57,8 +71,13 @@ function updateUI(data) {
 
     // Mover o tonearm
     const tonearm = document.getElementById('tonearm');
+    const tonearmAngleSpan = document.getElementById('angleValue');
+    if (tonearmAngleSpan && data.tonearmAngle !== undefined) {
+        tonearmAngleSpan.innerText = data.tonearmAngle.toFixed(1);
+    }
     if (tonearm && data.tonearmAngle !== undefined) {
         const visualAngle = map(data.tonearmAngle, 179, 125, -70, -20);
+
         tonearm.setAttribute('transform', `rotate(${visualAngle} 445 155)`);
     }
 
@@ -76,6 +95,13 @@ function updateUI(data) {
 function toggleMotor() {
     if (socket && socket.readyState === WebSocket.OPEN) {
         socket.send(JSON.stringify({ cmd: "toggle" }));
+    }
+}
+
+function toggleOper() {
+    if (socket && socket.readyState === WebSocket.OPEN) {
+        const newMode = isManual ? "auto" : "manual";
+        socket.send(JSON.stringify({ cmd: "oper", val: newMode }));
     }
 }
 

@@ -88,6 +88,8 @@ float posicaoLiftMin = 120.0; // baixado
 float posicaoLiftMax = 80.0;  // levantado
 bool finalDisco = false;
 
+bool manualOperation = false;
+
 // Debounce para ligar motor ao baixar tonearm
 unsigned long lowAngleStartTime = 0; // Timestamp quando ângulo primeiro <=160°
 unsigned long DEBOUNCE_DELAY_MS = 1500; // 2 segundos
@@ -134,24 +136,32 @@ float rpmSelecionado = 33.333;
 float ajusteFino33 = 1.0;
 float ajusteFino45 = 1.0;
 float posicaoServo = posicaoLiftMax;
+float targetServoPos = posicaoLiftMax;
+float currentServoPos = posicaoLiftMax;
+float servoStartPos = posicaoLiftMax;
+unsigned long servoMoveStartTime = 0;
+unsigned long servoMoveDuration = 0;
+unsigned long lastServoWriteTime = 0;
+unsigned long motorStartupTime = 0;
+bool motorStartupActive = false;
+
 bool atualizando = false;
 
 void moveServo(float angle, unsigned long time, bool hold) {
-// if (chipModel == "ESP32-C3") {
 #if (defined(CONFIG_IDF_TARGET_ESP32C3) || defined(ARDUINO_ESP32C3_DEV))
-
-  // Runtime logic for C3
-  // oServo.write(posicaoServo, time);
-  oServo.write(posicaoServo);
-//} else if (chipModel == "ESP32-S3") {
+  targetServoPos = angle;
+  servoStartPos = currentServoPos;
+  servoMoveStartTime = millis();
+  servoMoveDuration = time;
+  if (time == 0) {
+    currentServoPos = angle;
+    posicaoServo = currentServoPos;
+    oServo.write(currentServoPos);
+  }
 #elif (defined(CONFIG_IDF_TARGET_ESP32S3) || defined(ARDUINO_ESP32S3_DEV))
-  // Runtime logic for S3
   oServo.moveTo(angle, time, hold);
-//} else {
 #elif 0
-  // Handle other models
   oServo.write(servoPin, angle);
-//}
 #endif
 }
 
@@ -235,41 +245,32 @@ void toggleMotor(bool ligar = false) {
     DEBUG_PRINT("SUCESSO: UART comunicando!");
     Serial.print("SUCESSO: UART comunicando!");
   } else {
-    DEBUG_PRINTF("ERRO: Falha na comunicação (Código: %d)\n", result);
-    Serial.printf("ERRO: Falha na comunicação (Código: %d)\n", result);
-    DEBUG_PRINT("Verifique: 1. Alimentação VMOT (12V) ligada? 2. Resistor de "
-                "1k? 3. Pinos TX/RX invertidos?");
+    DEBUG_PRINTF("ERRO: Falha na comunicação (Código: %d)\\n", result);
+    Serial.printf("ERRO: Falha na comunicação (Código: %d)\\n", result);
+    DEBUG_PRINT("Verifique: 1. Alimentação VMOT (12V) ligada? 2. Resistor de 1k? 3. Pinos TX/RX invertidos?");
     digitalWrite(pinoEnable, HIGH);
   }
   if (ligar) {
-    // startRampTo(targetRPM,3);
     posicaoServo = posicaoLiftMin;
-    // ledcDetachPin(servoPin);
-    moveServo(posicaoServo, 1600, true);
+    moveServo(posicaoServo, 600, true);
     posicaoLift = false;
 
     // liga motor
-    driver.rms_current(1000); // 1000mA (limite do seu motor)
-
+    driver.rms_current(1000); // 1000mA (limite do motor)
     setRPM(targetRPM);
 
-    // 2. Espera o prato vencer a inércia (ex: 2 segundos)
-    // Nota: Em um código profissional, usaríamos um timer não bloqueante,
-    // mas para teste inicial o delay resolve:
-    delay(2000);
-
-    // 3. Volta para a corrente de cruzeiro para não esquentar o motor
-    driver.rms_current(RMS_CURRENT_MA); // Volta para os 800mA
+    // Inicia timer não bloqueante para voltar a corrente normal
+    motorStartupTime = millis();
+    motorStartupActive = true;
+    
 
   } else {
     posicaoServo = posicaoLiftMax;
-    moveServo(posicaoServo, 400, false);
+    moveServo(posicaoServo, 1200, false);
     posicaoLift = true;
 
     // desliga motor
     setRPM(0);
-    // delay(4100);  // ou melhor: use um timer não bloqueante
-    // ledcDetachPin(servoPin);
   }
   motorLigado = !motorLigado;
 }
@@ -289,6 +290,45 @@ void startRampTo(float newTargetRPM, float accelTimeSeconds = 2.0) {
   lastRampUpdate = millis();
 }
 
+File fsUploadFile;
+void handleFileUpload(){
+  HTTPUpload& upload = server.upload();
+  if(upload.status == UPLOAD_FILE_START){
+    String filename = upload.filename;
+    if(!filename.startsWith("/")) filename = "/"+filename;
+    fsUploadFile = LittleFS.open(filename, "w");
+  } else if(upload.status == UPLOAD_FILE_WRITE){
+    if(fsUploadFile) {
+      fsUploadFile.write(upload.buf, upload.currentSize);
+    }
+  } else if(upload.status == UPLOAD_FILE_END){
+    if(fsUploadFile) {
+      fsUploadFile.close();
+    }
+  }
+}
+
+void handleFileList() {
+  String json = "[";
+  fs::File root = LittleFS.open("/");
+  if(root && root.isDirectory()){
+      File file = root.openNextFile();
+      bool first = true;
+      while(file){
+          if(!first) json += ",";
+          json += "{\"name\":\"";
+          json += String(file.name());
+          json += "\",\"size\":";
+          json += String(file.size());
+          json += "}";
+          file = root.openNextFile();
+          first = false;
+      }
+  }
+  json += "]";
+  server.send(200, "application/json", json);
+}
+
 void broadcastStatus() {
   JsonDocument doc;
   doc["motorLigado"] = motorLigado;
@@ -300,6 +340,8 @@ void broadcastStatus() {
 #elif 0
   doc["tonearmAngle"] = tonearm.angleRead();
 #endif
+
+  doc["manualOp"] = manualOperation;
 
   doc["rpm"] = rpmSelecionado;
   doc["servoPos"] = posicaoServo;
@@ -334,6 +376,15 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload,
           posicaoServo = novaPos;
           moveServo(posicaoServo, 200, false);
         }
+      } else if (cmd == "oper") {
+        if (doc["val"] == "manual") {
+          manualOperation = true;
+        } else if (doc["val"] == "auto") {
+          manualOperation = false;
+        }
+        prefs.begin("config", false);
+        prefs.putBool("manualOp", manualOperation);
+        prefs.end();
       }
     }
   }
@@ -504,6 +555,7 @@ void setup() {
     }
   });
 
+
   DEBUG_PRINT("Server...OK");
 
   if (!LittleFS.begin(true)) {
@@ -511,6 +563,9 @@ void setup() {
     DEBUG_PRINT("LitleFS...Mount Failed");
   } else {
     server.serveStatic("/", LittleFS, "/");
+    server.on("/upload", HTTP_POST, [](){ server.send(200); }, handleFileUpload);
+    server.on("/list", HTTP_GET, handleFileList);
+  
   }
   DEBUG_PRINT("LitleFS...OK");
 
@@ -534,6 +589,7 @@ void setup() {
   posicaoLiftMax = prefs.getFloat("liftMax", 80.0f); // default 80.0 se não existir
   posicaoLiftMin = prefs.getFloat("liftMin", 120.0f);       // default 120.0
   DEBOUNCE_DELAY_MS = prefs.getULong("debounceMs", 2000UL); // default 2000 ms
+  manualOperation = prefs.getBool("manualOp", false);       // default false
 
   prefs.end();
 
@@ -545,6 +601,8 @@ void setup() {
 
   // Atualiza posicaoServo inicial com o valor salvo
   posicaoServo = posicaoLiftMax;
+  currentServoPos = posicaoLiftMax;
+  targetServoPos = posicaoLiftMax;
   // Serial.println("Início setup - antes de Wire");
 
   // Wire.begin(tonearmPin_SDA,tonearmPin_SCL); // SDA, SCL
@@ -567,6 +625,35 @@ void setup() {
 
 void loop() {
   webSocket.loop();
+
+  if (motorStartupActive && (millis() - motorStartupTime >= 2000)) {
+    driver.rms_current(RMS_CURRENT_MA); // Volta para corrente de cruzeiro
+    motorStartupActive = false;
+  }
+
+#if (defined(CONFIG_IDF_TARGET_ESP32C3) || defined(ARDUINO_ESP32C3_DEV))
+  if (currentServoPos != targetServoPos) {
+    if (servoMoveDuration == 0) {
+      currentServoPos = targetServoPos;
+      posicaoServo = currentServoPos;
+      oServo.write(currentServoPos);
+    } else {
+      if (millis() - lastServoWriteTime >= 15) { // Limita as atualizações a cada 15ms (não floda o PWM)
+        lastServoWriteTime = millis();
+        unsigned long elapsed = millis() - servoMoveStartTime;
+        if (elapsed >= servoMoveDuration) {
+          currentServoPos = targetServoPos;
+        } else {
+          float progress = (float)elapsed / servoMoveDuration;
+          currentServoPos = servoStartPos + (targetServoPos - servoStartPos) * progress;
+        }
+        posicaoServo = currentServoPos;
+        oServo.write(currentServoPos);
+      }
+    }
+  }
+#endif
+
 
   if (millis() - lastStatusUpdate > 200) {
     lastStatusUpdate = millis();
@@ -611,53 +698,56 @@ void loop() {
 
   //DEBUG_PRINTF("angulo tonearm: %.1f\n", tonearmAngle); // Mantenha para debug
 
-  // Sempre resetar finalDisco quando o braço for levantado (>160°)
-  // Isso permite religar depois de um "fim de disco" se o usuário levantar e abaixar novamente
-  if (tonearmAngle > 160.0) {
-    if (finalDisco) {
-      DEBUG_PRINT("Braço levantado → resetando finalDisco para permitir novo play");
-      finalDisco = false;
+  if (!manualOperation)
+  {
+    // Sempre resetar finalDisco quando o braço for levantado (>160°)
+    // Isso permite religar depois de um "fim de disco" se o usuário levantar e abaixar novamente
+    if (tonearmAngle > 160.0) {
+      if (finalDisco) {
+        DEBUG_PRINT("Braço levantado → resetando finalDisco para permitir novo play");
+        finalDisco = false;
+      }
     }
-  }
-  // Lógica de DESLIGAR (imediata, sem debounce - segurança primeiro)
-  if (motorLigado && (tonearmAngle > 160.0 || tonearmAngle < 125.0)) {
-    DEBUG_PRINT("angulo DESLIGANDO");
-    toggleMotor(false);
+    // Lógica de DESLIGAR (imediata, sem debounce - segurança primeiro)
+    if (motorLigado && (tonearmAngle > 160.0 || tonearmAngle < 125.0)) {
+      DEBUG_PRINT("angulo DESLIGANDO");
+      toggleMotor(false);
 
-    if (tonearmAngle < 125.0) {
-      DEBUG_PRINT("FINAL DISCO");
-      finalDisco = true;
-    }
-
-    // Reset debounce ao levantar
-    lowAngleStartTime = 0;
-    debounceLowAngleActive = false;
-  }
-
-  // Lógica de LIGAR com debounce de 2s (só se ângulo <=160° e >=125° por tempo
-  // contínuo)
-  else if (!motorLigado && !finalDisco) {
-    if (tonearmAngle <= 160.0 && tonearmAngle >= 125.0) {
-      if (!debounceLowAngleActive) {
-        // Começa a contar agora
-        lowAngleStartTime = millis();
-        debounceLowAngleActive = true;
-        DEBUG_PRINT("Iniciando debounce: tonearm baixado detectado");
+      if (tonearmAngle < 125.0) {
+        DEBUG_PRINT("FINAL DISCO");
+        finalDisco = true;
       }
 
-      // Verifica se já passou 2s contínuos
-      if (millis() - lowAngleStartTime >= DEBOUNCE_DELAY_MS) {
-        DEBUG_PRINT("Debounce OK - LIGANDO motor após 2s");
-        toggleMotor(true);
+      // Reset debounce ao levantar
+      lowAngleStartTime = 0;
+      debounceLowAngleActive = false;
+    }
 
-        // Reset debounce após ligar
+    // Lógica de LIGAR com debounce de 2s (só se ângulo <=160° e >=125° por tempo
+    // contínuo)
+    else if (!motorLigado && !finalDisco) {
+      if (tonearmAngle <= 160.0 && tonearmAngle >= 125.0) {
+        if (!debounceLowAngleActive) {
+          // Começa a contar agora
+          lowAngleStartTime = millis();
+          debounceLowAngleActive = true;
+          DEBUG_PRINT("Iniciando debounce: tonearm baixado detectado");
+        }
+
+        // Verifica se já passou 2s contínuos
+        if (millis() - lowAngleStartTime >= DEBOUNCE_DELAY_MS) {
+          DEBUG_PRINT("Debounce OK - LIGANDO motor após 2s");
+          toggleMotor(true);
+
+          // Reset debounce após ligar
+          lowAngleStartTime = 0;
+          debounceLowAngleActive = false;
+        }
+      } else {
+        // Saiu da faixa → cancela debounce
         lowAngleStartTime = 0;
         debounceLowAngleActive = false;
       }
-    } else {
-      // Saiu da faixa → cancela debounce
-      lowAngleStartTime = 0;
-      debounceLowAngleActive = false;
     }
   }
 

@@ -10,6 +10,11 @@
 <body>
     <h1>Toca-Discos</h1>
     
+    <!-- Botão de Operação (Auto/Manual) -->
+    <div>
+        <button id="btnOper" class="btn" style="background:#555; margin-bottom:15px; font-size:14px; padding:8px 15px;" onclick="toggleOper()">Modo: AUTOMÁTICO</button>
+    </div>
+
     <!-- Botão de Power -->
     <button id="btnToggle" class="btn btn-toggle" onclick="toggleMotor()">LIGAR MOTOR</button>
     <br><br>
@@ -22,6 +27,7 @@
     <br><br>
     <h3>Visualizador em Tempo Real</h3>
     <div class="visualizer-container">
+        <div id="tonearmAngle">Angulo: <span id="angleValue">0</span>°</div>
         <svg id="turntable" width="720" height="520" viewBox="0 0 520 520" xmlns="http://www.w3.org/2000/svg">
             <!-- Platter Group (gira) -->
             <g id="platter">
