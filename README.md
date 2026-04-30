@@ -31,7 +31,13 @@ This repository contains the firmware for a **Smart Record Player** project base
 * **Real-time WebSockets**: Continuous bidirectional telemetry communication, showing current speed, tonearm angle, and lift status on your browser or smartphone screen.
 * **Control Modes**: Switch between **Automatic** or **Manual** mode without needing to change code.
 
-### 5. Modern System and Connectivity
+### 5. Smart WiFi Setup (Access Point Mode)
+* **Zero Hardcoded Credentials**: WiFi SSID and password are never stored in the source code — credentials are saved securely in the ESP32's NVS (Non-Volatile Storage).
+* **Auto Access Point**: On first boot (or if the saved network is unreachable), the device automatically creates an open Wi-Fi hotspot named `TocaDiscos_Setup`.
+* **Captive Configuration Portal**: Connect to `TocaDiscos_Setup` and navigate to `http://192.168.4.1` — the device serves a setup page to enter your home Wi-Fi credentials. After saving, the ESP32 reboots and connects automatically.
+* **Runtime Reconfiguration**: Once on your home network, the Wi-Fi settings can be updated anytime from the `config.html` page without reflashing the firmware.
+
+### 6. Modern System and Connectivity
 * **OTA (Over-The-Air)**: Ability to remotely update firmware over the Wi-Fi network, without needing a USB cable connected after the device is assembled.
 * **Telnet Debug**: Embedded Telnet server on port 23 acting as a virtual serial monitor for practical diagnostics and tracking.
 * **Data Persistence**: Fine settings like servo max/min limits and debounce time are permanently recorded in the NVS memory.
@@ -53,7 +59,8 @@ According to the project mapping:
 ## ⚙️ Installation and Deployment (PlatformIO)
 
 1. Clone the repository and open the root folder in an IDE with PlatformIO (such as VS Code).
-2. Optionally, fill in your default Wi-Fi credentials in `src/main.cpp`.
-3. Make sure to run the **Upload Filesystem Image** task (in the PlatformIO menu) to send the `data/` folder containing the web interface to the ESP32's LittleFS.
-4. Run the **Build** and then **Upload** the application via cable.
-5. Access the panel by the designated IP or through `http://tocadiscos.local` if mDNS is operational on your network.
+2. Make sure to run the **Upload Filesystem Image** task (in the PlatformIO menu) to send the `data/` folder containing the web interface and WiFi setup page to the ESP32's LittleFS.
+3. Run the **Build** and then **Upload** the application via cable.
+4. On first boot, the device will emit an open Wi-Fi network: **`TocaDiscos_Setup`**.
+5. Connect to it and open `http://192.168.4.1` in your browser to enter your home Wi-Fi credentials.
+6. After saving, the device will reboot and connect to your network. Access it at `http://tocadiscos.local` or by its assigned IP.
