@@ -122,9 +122,8 @@ const int pinoEnable = 2;
 HardwareSerial mySerial(1);
 TMC2209Stepper driver(&mySerial, R_SENSE, DRIVER_ADDRESS);
 
-// Configuração Wifi
-const char *ssid = "SALVATI";
-const char *password = "2007112402";
+// Configuração Wifi dinâmico
+// (As credenciais serão lidas da memória NVS)
 
 WebServer server(80);
 WebSocketsServer webSocket = WebSocketsServer(81);
@@ -485,26 +484,59 @@ void setup() {
   // pixels.setPixelColor(0, pixels.Color(255, 0, 255));  // Purple
   // pixels.show();
 
-  // Configuração OTA
-  ArduinoOTA.setHostname("TocaDiscos-Gian");
+  // Inicializar LittleFS primeiro para poder servir a página AP
+  if (!LittleFS.begin(true)) {
+    Serial.println("LittleFS Mount Failed");
+    DEBUG_PRINT("LitleFS...Mount Failed");
+  } else {
+    DEBUG_PRINT("LitleFS...OK");
+  }
 
-  WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED)
-    delay(500);
+  // Obter credenciais salvas
+  prefs.begin("config", false);
+  String savedSSID = prefs.getString("wifi_ssid", "");
+  String savedPass = prefs.getString("wifi_pass", "");
+  prefs.end();
 
-  DEBUG_PRINT("Wifi...OK");
-  DEBUG_PRINT(WiFi.localIP().toString().c_str());
+  bool isAPMode = false;
 
-  telnet.begin(); // Inicia servidor Telnet na porta 23 padrão
-  telnet.println("Use como Serial Monitor remoto.");
+  if (savedSSID != "") {
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(savedSSID.c_str(), savedPass.c_str());
+    int attempts = 0;
+    while (WiFi.status() != WL_CONNECTED && attempts < 20) { // Aguarda 10s
+      delay(500);
+      attempts++;
+    }
+  }
 
-  DEBUG_PRINT("Telnet...OK");
-
-  MDNS.begin("tocadiscos");
+  if (WiFi.status() != WL_CONNECTED) {
+    // Falhou ou não havia SSID. Inicia Access Point
+    WiFi.mode(WIFI_AP);
+    WiFi.softAP("TocaDiscos_Setup");
+    isAPMode = true;
+    DEBUG_PRINT("Wifi falhou/ausente. Modo AP iniciado: TocaDiscos_Setup");
+    DEBUG_PRINT(WiFi.softAPIP().toString().c_str());
+  } else {
+    DEBUG_PRINT("Wifi...OK");
+    DEBUG_PRINT(WiFi.localIP().toString().c_str());
+    
+    // Configuração OTA, Telnet e mDNS só em modo STA
+    ArduinoOTA.setHostname("TocaDiscos-Gian");
+    telnet.begin(); // Inicia servidor Telnet na porta 23 padrão
+    telnet.println("Use como Serial Monitor remoto.");
+    DEBUG_PRINT("Telnet...OK");
+    MDNS.begin("tocadiscos");
+  }
 
   // Rotas do Servidor
-  server.on("/", HTTP_GET, []() {
+  server.on("/", HTTP_GET, [isAPMode]() {
     DEBUG_PRINT("On / handler...");
+    if (isAPMode) {
+      server.sendHeader("Location", "/wifi.html", true);
+      server.send(302, "text/plain", "");
+      return;
+    }
     File file = LittleFS.open("/index.html", "r");
     if (!file) {
       DEBUG_PRINT("404 error...");
@@ -556,18 +588,38 @@ void setup() {
   });
 
 
-  DEBUG_PRINT("Server...OK");
+  server.on("/save_wifi", []() {
+    if (server.hasArg("ssid") && server.hasArg("pass")) {
+      String newSSID = server.arg("ssid");
+      String newPass = server.arg("pass");
+      prefs.begin("config", false);
+      prefs.putString("wifi_ssid", newSSID);
+      prefs.putString("wifi_pass", newPass);
+      prefs.end();
+      
+      server.send(200, "text/plain", "OK");
+      delay(500);
+      ESP.restart();
+    } else {
+      server.send(400, "text/plain", "Parâmetros ausentes");
+    }
+  });
 
-  if (!LittleFS.begin(true)) {
-    Serial.println("LittleFS Mount Failed");
-    DEBUG_PRINT("LitleFS...Mount Failed");
-  } else {
-    server.serveStatic("/", LittleFS, "/");
-    server.on("/upload", HTTP_POST, [](){ server.send(200); }, handleFileUpload);
-    server.on("/list", HTTP_GET, handleFileList);
-  
-  }
-  DEBUG_PRINT("LitleFS...OK");
+  server.on("/wifi.html", HTTP_GET, []() {
+    File file = LittleFS.open("/wifi.html", "r");
+    if (!file) {
+      server.send(404, "text/plain", "wifi.html não encontrado. Faça upload do Filesystem Image!");
+      return;
+    }
+    server.streamFile(file, "text/html");
+    file.close();
+  });
+
+  DEBUG_PRINT("Server routes...OK");
+
+  server.serveStatic("/", LittleFS, "/");
+  server.on("/upload", HTTP_POST, [](){ server.send(200); }, handleFileUpload);
+  server.on("/list", HTTP_GET, handleFileList);
 
   webSocket.begin();
   webSocket.onEvent(webSocketEvent);

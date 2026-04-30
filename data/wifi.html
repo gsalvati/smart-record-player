@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configuração WiFi - GIRA</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background: #0f0f0f;
+            color: #eee;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 24px;
+        }
+
+        .card {
+            background: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            border-radius: 14px;
+            padding: 36px 32px;
+            width: 100%;
+            max-width: 420px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        }
+
+        .icon {
+            font-size: 48px;
+            text-align: center;
+            margin-bottom: 8px;
+        }
+
+        h1 {
+            font-size: 22px;
+            font-weight: 700;
+            text-align: center;
+            color: #fff;
+            margin-bottom: 6px;
+        }
+
+        .subtitle {
+            font-size: 13px;
+            color: #777;
+            text-align: center;
+            margin-bottom: 28px;
+            line-height: 1.5;
+        }
+
+        label {
+            display: block;
+            font-size: 13px;
+            color: #aaa;
+            margin-bottom: 6px;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+        }
+
+        input[type="text"],
+        input[type="password"] {
+            width: 100%;
+            background: #111;
+            border: 1px solid #333;
+            border-radius: 8px;
+            color: #eee;
+            font-size: 15px;
+            padding: 12px 14px;
+            margin-bottom: 18px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        input[type="text"]:focus,
+        input[type="password"]:focus {
+            border-color: #e67e22;
+        }
+
+        .btn {
+            width: 100%;
+            background: linear-gradient(135deg, #e67e22, #f39c12);
+            border: none;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 15px;
+            font-weight: 700;
+            padding: 14px;
+            cursor: pointer;
+            letter-spacing: 0.5px;
+            transition: opacity 0.2s, transform 0.1s;
+            margin-top: 4px;
+        }
+
+        .btn:hover {
+            opacity: 0.9;
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+        }
+
+        .btn-secondary {
+            background: #2a2a2a;
+            margin-top: 12px;
+            color: #aaa;
+        }
+
+        #status {
+            margin-top: 18px;
+            font-size: 14px;
+            text-align: center;
+            min-height: 20px;
+            border-radius: 6px;
+            padding: 10px;
+            display: none;
+        }
+
+        #status.success {
+            display: block;
+            background: rgba(46, 204, 113, 0.12);
+            color: #2ecc71;
+            border: 1px solid rgba(46, 204, 113, 0.3);
+        }
+
+        #status.error {
+            display: block;
+            background: rgba(231, 76, 60, 0.12);
+            color: #e74c3c;
+            border: 1px solid rgba(231, 76, 60, 0.3);
+        }
+
+        #status.info {
+            display: block;
+            background: rgba(52, 152, 219, 0.12);
+            color: #3498db;
+            border: 1px solid rgba(52, 152, 219, 0.3);
+        }
+
+        .divider {
+            border: none;
+            border-top: 1px solid #2a2a2a;
+            margin: 20px 0;
+        }
+
+        .ap-info {
+            font-size: 12px;
+            color: #555;
+            text-align: center;
+            margin-top: 16px;
+            line-height: 1.6;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="card">
+        <div class="icon">📻</div>
+        <h1>Configuração WiFi</h1>
+        <p class="subtitle">Conecte o Toca-Discos à sua rede doméstica.<br>Após salvar, o dispositivo irá reiniciar.</p>
+
+        <label for="ssid">Nome da Rede (SSID)</label>
+        <input type="text" id="ssid" placeholder="Ex: MinhaRede" autocomplete="off" autocorrect="off"
+            autocapitalize="off" spellcheck="false">
+
+        <label for="pass">Senha da Rede</label>
+        <input type="password" id="pass" placeholder="Senha do WiFi">
+
+        <button class="btn" id="btnSalvar" onclick="salvarWifi()">CONECTAR E SALVAR</button>
+
+        <div id="status"></div>
+
+        <hr class="divider">
+        <p class="ap-info">
+            Após salvar, o aparelho tentará conectar à rede informada.<br>
+            Reconecte seu dispositivo à sua rede WiFi normal e acesse<br>
+            <strong>http://tocadiscos.local</strong>
+        </p>
+    </div>
+
+    <script>
+        function salvarWifi() {
+            const ssid = document.getElementById('ssid').value.trim();
+            const pass = document.getElementById('pass').value;
+            const btn = document.getElementById('btnSalvar');
+            const status = document.getElementById('status');
+
+            if (!ssid) {
+                status.className = 'error';
+                status.textContent = '⚠️ Por favor informe o nome da rede (SSID).';
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span>Salvando...';
+            status.className = 'info';
+            status.textContent = '⏳ Salvando credenciais e reiniciando...';
+
+            fetch('/save_wifi?ssid=' + encodeURIComponent(ssid) + '&pass=' + encodeURIComponent(pass))
+                .then(r => {
+                    if (r.ok) {
+                        status.className = 'success';
+                        status.innerHTML = '✅ Salvo! O Toca-Discos está reiniciando.<br>Reconecte à sua rede WiFi e acesse <strong>http://tocadiscos.local</strong>';
+                        btn.innerHTML = 'CONECTAR E SALVAR';
+                        btn.disabled = false;
+                    } else {
+                        throw new Error('Erro');
+                    }
+                })
+                .catch(() => {
+                    // Em modo AP, o ESP reinicia e corta a conexão — isso é esperado.
+                    status.className = 'success';
+                    status.innerHTML = '✅ Salvo! O Toca-Discos está reiniciando.<br>Reconecte à sua rede WiFi e acesse <strong>http://tocadiscos.local</strong>';
+                    btn.innerHTML = 'CONECTAR E SALVAR';
+                    btn.disabled = false;
+                });
+        }
+
+        // Permite submeter com Enter
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') salvarWifi();
+        });
+    </script>
+</body>
+
+</html>
