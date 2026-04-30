@@ -4,6 +4,13 @@
 
 This repository contains the firmware for a **Smart Record Player** project based on the ESP32-C3 microcontroller. It utilizes high-precision stepper motor control, advanced angular reading, and a web interface to provide an automated and modern experience for vinyl record playback.
 
+## 📸 Web Interface Preview
+
+<p align="center">
+  <a href="assets/webApp-01.png"><img src="assets/webApp-01.png" width="45%" alt="Web Interface 1"></a>
+  <a href="assets/webApp-02.png"><img src="assets/webApp-02.png" width="45%" alt="Web Interface 2"></a>
+</p>
+
 ## 🌟 Features and Functionalities
 
 ### 1. Precise and Silent Platter Control (TMC2209)

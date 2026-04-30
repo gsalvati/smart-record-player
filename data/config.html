@@ -1,13 +1,15 @@
 <!DOCTYPE html>
 <html lang="pt-br">
+
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Configurações - Toca-Discos</title>
-    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
-    <h1>Configurações do Toca-Discos</h1>
+    <h1>Configurações GIRA</h1>
 
     <h3>Posição Servo Levantado (liftMax)</h3>
     <input type="number" id="liftMax" step="0.1" value="80.0">
@@ -20,14 +22,16 @@
 
     <hr style="border-color:#333; margin:20px 0;">
     <h3>Gerenciador de Arquivos (LittleFS)</h3>
-    <div id="fileList" style="background:#1a1a1a; padding:10px; border-radius:5px; text-align:left; max-width:80%; margin:0 auto;">
+    <div id="fileList"
+        style="background:#1a1a1a; padding:10px; border-radius:5px; text-align:left; max-width:80%; margin:0 auto;">
         <p>Carregando arquivos...</p>
     </div>
     <br>
     <div style="background:#1a1a1a; padding:10px; border-radius:5px; text-align:center; max-width:80%; margin:0 auto;">
         <input type="file" id="fileInput" style="margin-bottom:10px;">
         <br>
-        <button class="btn" style="background:#2ecc71; color:white; padding:10px 20px; font-size:16px;" onclick="uploadFile()">ENVIAR ARQUIVO</button>
+        <button class="btn" style="background:#2ecc71; color:white; padding:10px 20px; font-size:16px;"
+            onclick="uploadFile()">ENVIAR ARQUIVO</button>
         <p id="uploadStatus"></p>
     </div>
 
@@ -39,9 +43,9 @@
 
     <script>
         fetch('/get_config').then(r => r.json()).then(data => {
-            if(data.liftMax !== undefined) document.getElementById('liftMax').value = data.liftMax;
-            if(data.liftMin !== undefined) document.getElementById('liftMin').value = data.liftMin;
-            if(data.debounceSec !== undefined) document.getElementById('debounceSec').value = data.debounceSec;
+            if (data.liftMax !== undefined) document.getElementById('liftMax').value = data.liftMax;
+            if (data.liftMin !== undefined) document.getElementById('liftMin').value = data.liftMin;
+            if (data.debounceSec !== undefined) document.getElementById('debounceSec').value = data.debounceSec;
         });
 
         function salvar() {
@@ -49,17 +53,17 @@
             let liftMin = document.getElementById("liftMin").value;
             let debounceSec = document.getElementById("debounceSec").value;
             fetch("/salvar?liftMax=" + liftMax + "&liftMin=" + liftMin + "&debounce=" + debounceSec)
-              .then(r => r.text()).then(txt => {
-                  document.getElementById("status").innerText = txt;
-              });
+                .then(r => r.text()).then(txt => {
+                    document.getElementById("status").innerText = txt;
+                });
         }
 
         function loadFiles() {
             fetch("/list").then(r => r.json()).then(files => {
                 let html = "<ul style=\"list-style:none; padding:0;\">";
-                if(files.length === 0) html += "<li>Nenhum arquivo encontrado.</li>";
+                if (files.length === 0) html += "<li>Nenhum arquivo encontrado.</li>";
                 files.forEach(f => {
-                    html += `<li>📄 <b>${f.name}</b> (${(f.size/1024).toFixed(2)} KB)</li>`;
+                    html += `<li>📄 <b>${f.name}</b> (${(f.size / 1024).toFixed(2)} KB)</li>`;
                 });
                 html += "</ul>";
                 document.getElementById("fileList").innerHTML = html;
@@ -67,16 +71,16 @@
                 document.getElementById("fileList").innerHTML = "<p>Erro ao carregar arquivos.</p>";
             });
         }
-        
+
         function uploadFile() {
             const input = document.getElementById("fileInput");
-            if(input.files.length === 0) return;
+            if (input.files.length === 0) return;
             const file = input.files[0];
             const data = new FormData();
             data.append("file", file, "/" + file.name); // explicitly adding slash to root
             document.getElementById("uploadStatus").innerText = "Enviando...";
             fetch("/upload", { method: "POST", body: data }).then(r => {
-                if(r.ok) {
+                if (r.ok) {
                     document.getElementById("uploadStatus").innerText = "Enviado com sucesso!";
                     loadFiles();
                 } else {
@@ -89,4 +93,5 @@
 
     </script>
 </body>
+
 </html>
