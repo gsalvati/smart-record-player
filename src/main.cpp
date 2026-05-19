@@ -51,12 +51,12 @@ MT6701 tonearm;
   do {                                                                         \
     telnet.println(x);                                                         \
     Serial.println(x);                                                         \
-} while (0)
+  } while (0)
 #define DEBUG_PRINTF(...)                                                      \
   do {                                                                         \
     telnet.printf(__VA_ARGS__);                                                \
     Serial.printf(__VA_ARGS__);                                                \
-} while (0)
+  } while (0)
 
 // Defina o pino e número de LEDs (geralmente 1 no onboard)
 #define LED_PIN 8 // Tente 48 primeiro (mais comum no N8)
@@ -64,9 +64,9 @@ MT6701 tonearm;
 // v1.1)
 #define NUM_LEDS 1
 
-  // Adafruit_NeoPixel pixels(NUM_LEDS, LED_PIN, NEO_GRB + NEO_KHZ800);
+// Adafruit_NeoPixel pixels(NUM_LEDS, LED_PIN, NEO_GRB + NEO_KHZ800);
 
-  bool wifiConectadoAnterior = false;
+bool wifiConectadoAnterior = false;
 
 // Velocidade desejada (RPM) - você pode mudar via Serial
 volatile float targetRPM = 33.33; // ← ALTERE AQUI ou via Serial Monitor
@@ -87,6 +87,9 @@ bool posicaoLift = true;      // Estado inicial
 float posicaoLiftMin = 120.0; // baixado
 float posicaoLiftMax = 80.0;  // levantado
 bool finalDisco = false;
+
+unsigned long tempoDescidaLigarMs = 1200;
+unsigned long tempoSubidaDesligarMs = 2400;
 
 bool manualOperation = false;
 
@@ -246,12 +249,13 @@ void toggleMotor(bool ligar = false) {
   } else {
     DEBUG_PRINTF("ERRO: Falha na comunicação (Código: %d)\\n", result);
     Serial.printf("ERRO: Falha na comunicação (Código: %d)\\n", result);
-    DEBUG_PRINT("Verifique: 1. Alimentação VMOT (12V) ligada? 2. Resistor de 1k? 3. Pinos TX/RX invertidos?");
+    DEBUG_PRINT("Verifique: 1. Alimentação VMOT (12V) ligada? 2. Resistor de "
+                "1k? 3. Pinos TX/RX invertidos?");
     digitalWrite(pinoEnable, HIGH);
   }
   if (ligar) {
     posicaoServo = posicaoLiftMin;
-    moveServo(posicaoServo, 600, true);
+    moveServo(posicaoServo, tempoDescidaLigarMs, true);
     posicaoLift = false;
 
     // liga motor
@@ -261,13 +265,12 @@ void toggleMotor(bool ligar = false) {
     // Inicia timer não bloqueante para voltar a corrente normal
     motorStartupTime = millis();
     motorStartupActive = true;
-    
 
   } else {
     posicaoServo = posicaoLiftMax;
-    moveServo(posicaoServo, 1200, false);
+    moveServo(posicaoServo, tempoSubidaDesligarMs, false);
     posicaoLift = true;
-
+    delay(3000);
     // desliga motor
     setRPM(0);
   }
@@ -290,18 +293,19 @@ void startRampTo(float newTargetRPM, float accelTimeSeconds = 2.0) {
 }
 
 File fsUploadFile;
-void handleFileUpload(){
-  HTTPUpload& upload = server.upload();
-  if(upload.status == UPLOAD_FILE_START){
+void handleFileUpload() {
+  HTTPUpload &upload = server.upload();
+  if (upload.status == UPLOAD_FILE_START) {
     String filename = upload.filename;
-    if(!filename.startsWith("/")) filename = "/"+filename;
+    if (!filename.startsWith("/"))
+      filename = "/" + filename;
     fsUploadFile = LittleFS.open(filename, "w");
-  } else if(upload.status == UPLOAD_FILE_WRITE){
-    if(fsUploadFile) {
+  } else if (upload.status == UPLOAD_FILE_WRITE) {
+    if (fsUploadFile) {
       fsUploadFile.write(upload.buf, upload.currentSize);
     }
-  } else if(upload.status == UPLOAD_FILE_END){
-    if(fsUploadFile) {
+  } else if (upload.status == UPLOAD_FILE_END) {
+    if (fsUploadFile) {
       fsUploadFile.close();
     }
   }
@@ -310,19 +314,20 @@ void handleFileUpload(){
 void handleFileList() {
   String json = "[";
   fs::File root = LittleFS.open("/");
-  if(root && root.isDirectory()){
-      File file = root.openNextFile();
-      bool first = true;
-      while(file){
-          if(!first) json += ",";
-          json += "{\"name\":\"";
-          json += String(file.name());
-          json += "\",\"size\":";
-          json += String(file.size());
-          json += "}";
-          file = root.openNextFile();
-          first = false;
-      }
+  if (root && root.isDirectory()) {
+    File file = root.openNextFile();
+    bool first = true;
+    while (file) {
+      if (!first)
+        json += ",";
+      json += "{\"name\":\"";
+      json += String(file.name());
+      json += "\",\"size\":";
+      json += String(file.size());
+      json += "}";
+      file = root.openNextFile();
+      first = false;
+    }
   }
   json += "]";
   server.send(200, "application/json", json);
@@ -391,7 +396,8 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload,
 
 void setup() {
   Serial.begin(115200); // use Serial normal do ESP32 para debug
-  Serial.setTxTimeoutMs(0); // Evita que o ESP32 trave se o Serial Monitor estiver fechado
+  Serial.setTxTimeoutMs(
+      0); // Evita que o ESP32 trave se o Serial Monitor estiver fechado
   DEBUG_PRINT("Setup init...");
 
 #if (defined(CONFIG_IDF_TARGET_ESP32C3) || defined(ARDUINO_ESP32C3_DEV))
@@ -520,7 +526,7 @@ void setup() {
   } else {
     DEBUG_PRINT("Wifi...OK");
     DEBUG_PRINT(WiFi.localIP().toString().c_str());
-    
+
     // Configuração OTA, Telnet e mDNS só em modo STA
     ArduinoOTA.setHostname("TocaDiscos-Gian");
     telnet.begin(); // Inicia servidor Telnet na porta 23 padrão
@@ -553,30 +559,39 @@ void setup() {
     String json = "{";
     json += "\"liftMax\":" + String(posicaoLiftMax, 1) + ",";
     json += "\"liftMin\":" + String(posicaoLiftMin, 1) + ",";
-    json += "\"debounceSec\":" + String(DEBOUNCE_DELAY_MS / 1000.0, 2);
+    json += "\"debounceSec\":" + String(DEBOUNCE_DELAY_MS / 1000.0, 2) + ",";
+    json += "\"tempoDescida\":" + String(tempoDescidaLigarMs) + ",";
+    json += "\"tempoSubida\":" + String(tempoSubidaDesligarMs);
     json += "}";
     server.send(200, "application/json", json);
   });
 
   server.on("/salvar", []() {
     if (server.hasArg("liftMax") && server.hasArg("liftMin") &&
-        server.hasArg("debounce")) {
+        server.hasArg("debounce") && server.hasArg("tempoDescida") && server.hasArg("tempoSubida")) {
       float newMax = server.arg("liftMax").toFloat();
       float newMin = server.arg("liftMin").toFloat();
       float newDebounceSec = server.arg("debounce").toFloat();
+      unsigned long newTempoDescida = server.arg("tempoDescida").toInt();
+      unsigned long newTempoSubida = server.arg("tempoSubida").toInt();
       if (newMax >= 0 && newMax <= 180 && newMin >= 0 && newMin <= 180 &&
-          newMax < newMin && newDebounceSec >= 0.5 && newDebounceSec <= 10.0) {
+          newMax < newMin && newDebounceSec >= 0.5 && newDebounceSec <= 10.0 &&
+          newTempoDescida >= 0 && newTempoSubida >= 0) {
         prefs.begin("config", false);
         prefs.putFloat("liftMax", newMax);
         prefs.putFloat("liftMin", newMin);
         prefs.putULong("debounceMs", (unsigned long)(newDebounceSec * 1000));
+        prefs.putULong("tempoDescida", newTempoDescida);
+        prefs.putULong("tempoSubida", newTempoSubida);
         prefs.end();
         posicaoLiftMax = newMax;
         posicaoLiftMin = newMin;
         DEBOUNCE_DELAY_MS = (unsigned long)(newDebounceSec * 1000);
+        tempoDescidaLigarMs = newTempoDescida;
+        tempoSubidaDesligarMs = newTempoSubida;
         telnet.printf(
-            "Config salva: liftMax=%.1f, liftMin=%.1f, debounce=%lu ms\n",
-            posicaoLiftMax, posicaoLiftMin, DEBOUNCE_DELAY_MS);
+            "Config salva: liftMax=%.1f, liftMin=%.1f, debounce=%lu ms, descida=%lu ms, subida=%lu ms\n",
+            posicaoLiftMax, posicaoLiftMin, DEBOUNCE_DELAY_MS, tempoDescidaLigarMs, tempoSubidaDesligarMs);
         server.send(200, "text/plain", "Configurações salvas com sucesso!");
       } else {
         server.send(400, "text/plain",
@@ -587,7 +602,6 @@ void setup() {
     }
   });
 
-
   server.on("/save_wifi", []() {
     if (server.hasArg("ssid") && server.hasArg("pass")) {
       String newSSID = server.arg("ssid");
@@ -596,7 +610,7 @@ void setup() {
       prefs.putString("wifi_ssid", newSSID);
       prefs.putString("wifi_pass", newPass);
       prefs.end();
-      
+
       server.send(200, "text/plain", "OK");
       delay(500);
       ESP.restart();
@@ -608,7 +622,8 @@ void setup() {
   server.on("/wifi.html", HTTP_GET, []() {
     File file = LittleFS.open("/wifi.html", "r");
     if (!file) {
-      server.send(404, "text/plain", "wifi.html não encontrado. Faça upload do Filesystem Image!");
+      server.send(404, "text/plain",
+                  "wifi.html não encontrado. Faça upload do Filesystem Image!");
       return;
     }
     server.streamFile(file, "text/html");
@@ -618,7 +633,7 @@ void setup() {
   DEBUG_PRINT("Server routes...OK");
 
   server.serveStatic("/", LittleFS, "/");
-  server.on("/upload", HTTP_POST, [](){ server.send(200); }, handleFileUpload);
+  server.on("/upload", HTTP_POST, []() { server.send(200); }, handleFileUpload);
   server.on("/list", HTTP_GET, handleFileList);
 
   webSocket.begin();
@@ -638,18 +653,21 @@ void setup() {
   // Carregar configurações salvas da NVS
   prefs.begin("config", false); // namespace "config"
 
-  posicaoLiftMax = prefs.getFloat("liftMax", 80.0f); // default 80.0 se não existir
+  posicaoLiftMax =
+      prefs.getFloat("liftMax", 80.0f); // default 80.0 se não existir
   posicaoLiftMin = prefs.getFloat("liftMin", 120.0f);       // default 120.0
   DEBOUNCE_DELAY_MS = prefs.getULong("debounceMs", 2000UL); // default 2000 ms
   manualOperation = prefs.getBool("manualOp", false);       // default false
+  tempoDescidaLigarMs = prefs.getULong("tempoDescida", 1200UL);
+  tempoSubidaDesligarMs = prefs.getULong("tempoSubida", 2400UL);
 
   prefs.end();
 
   DEBUG_PRINT("Config load...OK");
 
   telnet.printf(
-      "Config carregada: liftMax=%.1f°, liftMin=%.1f°, debounce=%lu ms\n",
-      posicaoLiftMax, posicaoLiftMin, DEBOUNCE_DELAY_MS);
+      "Config carregada: liftMax=%.1f°, liftMin=%.1f°, debounce=%lu ms, descida=%lu ms, subida=%lu ms\n",
+      posicaoLiftMax, posicaoLiftMin, DEBOUNCE_DELAY_MS, tempoDescidaLigarMs, tempoSubidaDesligarMs);
 
   // Atualiza posicaoServo inicial com o valor salvo
   posicaoServo = posicaoLiftMax;
@@ -660,7 +678,7 @@ void setup() {
   // Wire.begin(tonearmPin_SDA,tonearmPin_SCL); // SDA, SCL
 
 #if (defined(CONFIG_IDF_TARGET_ESP32C3) || defined(ARDUINO_ESP32C3_DEV))
-   tonearm.initializeI2C(&Wire);
+  tonearm.initializeI2C(&Wire);
 #elif (defined(CONFIG_IDF_TARGET_ESP32S3) || defined(ARDUINO_ESP32S3_DEV))
   tonearm.begin();
 #elif 0
@@ -690,14 +708,16 @@ void loop() {
       posicaoServo = currentServoPos;
       oServo.write(currentServoPos);
     } else {
-      if (millis() - lastServoWriteTime >= 15) { // Limita as atualizações a cada 15ms (não floda o PWM)
+      if (millis() - lastServoWriteTime >=
+          15) { // Limita as atualizações a cada 15ms (não floda o PWM)
         lastServoWriteTime = millis();
         unsigned long elapsed = millis() - servoMoveStartTime;
         if (elapsed >= servoMoveDuration) {
           currentServoPos = targetServoPos;
         } else {
           float progress = (float)elapsed / servoMoveDuration;
-          currentServoPos = servoStartPos + (targetServoPos - servoStartPos) * progress;
+          currentServoPos =
+              servoStartPos + (targetServoPos - servoStartPos) * progress;
         }
         posicaoServo = currentServoPos;
         oServo.write(currentServoPos);
@@ -705,7 +725,6 @@ void loop() {
     }
   }
 #endif
-
 
   if (millis() - lastStatusUpdate > 200) {
     lastStatusUpdate = millis();
@@ -738,25 +757,27 @@ void loop() {
                
                    wifiConectadoAnterior = wifiConectadoAgora;
                  */
-  //float tonearmAngle = 0;
-  // acionar o motor conforme o angulo do braço
-  #if (defined(CONFIG_IDF_TARGET_ESP32C3) || defined(ARDUINO_ESP32C3_DEV))
-    float tonearmAngle = tonearm.angleRead();
-  #elif (defined(CONFIG_IDF_TARGET_ESP32S3) || defined(ARDUINO_ESP32S3_DEV))
-    float tonearmAngle = tonearm.getAngleDegrees();
-  #elif 0
-    float tonearmAngle = tonearm.angleRead();
-  #endif
+// float tonearmAngle = 0;
+//  acionar o motor conforme o angulo do braço
+#if (defined(CONFIG_IDF_TARGET_ESP32C3) || defined(ARDUINO_ESP32C3_DEV))
+  float tonearmAngle = tonearm.angleRead();
+#elif (defined(CONFIG_IDF_TARGET_ESP32S3) || defined(ARDUINO_ESP32S3_DEV))
+  float tonearmAngle = tonearm.getAngleDegrees();
+#elif 0
+  float tonearmAngle = tonearm.angleRead();
+#endif
 
-  //DEBUG_PRINTF("angulo tonearm: %.1f\n", tonearmAngle); // Mantenha para debug
+  // DEBUG_PRINTF("angulo tonearm: %.1f\n", tonearmAngle); // Mantenha para
+  // debug
 
-  if (!manualOperation)
-  {
+  if (!manualOperation) {
     // Sempre resetar finalDisco quando o braço for levantado (>160°)
-    // Isso permite religar depois de um "fim de disco" se o usuário levantar e abaixar novamente
+    // Isso permite religar depois de um "fim de disco" se o usuário levantar e
+    // abaixar novamente
     if (tonearmAngle > 160.0) {
       if (finalDisco) {
-        DEBUG_PRINT("Braço levantado → resetando finalDisco para permitir novo play");
+        DEBUG_PRINT(
+            "Braço levantado → resetando finalDisco para permitir novo play");
         finalDisco = false;
       }
     }
@@ -775,8 +796,8 @@ void loop() {
       debounceLowAngleActive = false;
     }
 
-    // Lógica de LIGAR com debounce de 2s (só se ângulo <=160° e >=125° por tempo
-    // contínuo)
+    // Lógica de LIGAR com debounce de 2s (só se ângulo <=160° e >=125° por
+    // tempo contínuo)
     else if (!motorLigado && !finalDisco) {
       if (tonearmAngle <= 160.0 && tonearmAngle >= 125.0) {
         if (!debounceLowAngleActive) {

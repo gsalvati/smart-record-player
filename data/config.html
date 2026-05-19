@@ -20,6 +20,12 @@
     <h3>Tempo para ligar motor (debounce em segundos)</h3>
     <input type="number" id="debounceSec" step="0.1" min="0.5" max="10" value="2.0">
 
+    <h3>Tempo de subida ao desligar (ms)</h3>
+    <input type="number" id="tempoSubida" step="1" min="0" value="2400">
+
+    <h3>Tempo de descida ao ligar (ms)</h3>
+    <input type="number" id="tempoDescida" step="1" min="0" value="1200">
+
     <hr style="border-color:#333; margin:20px 0;">
     <h3>Gerenciador de Arquivos (LittleFS)</h3>
     <div id="fileList"
@@ -51,13 +57,17 @@
             if (data.liftMax !== undefined) document.getElementById('liftMax').value = data.liftMax;
             if (data.liftMin !== undefined) document.getElementById('liftMin').value = data.liftMin;
             if (data.debounceSec !== undefined) document.getElementById('debounceSec').value = data.debounceSec;
+            if (data.tempoSubida !== undefined) document.getElementById('tempoSubida').value = data.tempoSubida;
+            if (data.tempoDescida !== undefined) document.getElementById('tempoDescida').value = data.tempoDescida;
         });
 
         function salvar() {
             let liftMax = document.getElementById("liftMax").value;
             let liftMin = document.getElementById("liftMin").value;
             let debounceSec = document.getElementById("debounceSec").value;
-            fetch("/salvar?liftMax=" + liftMax + "&liftMin=" + liftMin + "&debounce=" + debounceSec)
+            let tempoSubida = document.getElementById("tempoSubida").value;
+            let tempoDescida = document.getElementById("tempoDescida").value;
+            fetch("/salvar?liftMax=" + liftMax + "&liftMin=" + liftMin + "&debounce=" + debounceSec + "&tempoSubida=" + tempoSubida + "&tempoDescida=" + tempoDescida)
                 .then(r => r.text()).then(txt => {
                     document.getElementById("status").innerText = txt;
                 });
