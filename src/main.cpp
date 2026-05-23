@@ -46,6 +46,7 @@ Preferences prefs;
 
 ESPTelnet telnet;
 MT6701 tonearm;
+#define MT6701_ADDR 0x06
 
 #define DEBUG_PRINT(x)                                                         \
   do {                                                                         \
@@ -59,10 +60,10 @@ MT6701 tonearm;
   } while (0)
 
 // Defina o pino e número de LEDs (geralmente 1 no onboard)
-#define LED_PIN 8 // Tente 48 primeiro (mais comum no N8)
+//#define LED_PIN 8 // Tente 48 primeiro (mais comum no N8)
 // #define LED_PIN 38    // Se não funcionar com 48, teste 38 (algumas revisões
 // v1.1)
-#define NUM_LEDS 1
+//#define NUM_LEDS 1
 
 // Adafruit_NeoPixel pixels(NUM_LEDS, LED_PIN, NEO_GRB + NEO_KHZ800);
 
@@ -76,6 +77,7 @@ unsigned long lastRampUpdate = 0;
 const unsigned long RAMP_INTERVAL_MS = 20; // atualiza a cada 20 ms
 float rampIncrementPerStep = 0;            // calculado quando inicia rampa
 bool isRamping = false;
+float tonearmAngle = 0;
 
 static const int servoPin = 10;
 
@@ -166,6 +168,25 @@ void moveServo(float angle, unsigned long time, bool hold) {
   oServo.write(servoPin, angle);
 #endif
 }
+
+
+bool verificarSensorMT6701() {
+  // Inicia uma transmissão vazia para o endereço do sensor
+  Wire.beginTransmission(MT6701_ADDR);
+  
+  // endTransmission(true) envia o sinal de STOP e retorna o status da tentativa
+  byte erro = Wire.endTransmission(true); 
+  
+  if (erro == 0) {
+    DEBUG_PRINT("[SUCESSO] Sensor MT6701 encontrado e respondendo!");
+    return true;
+  } else {
+    DEBUG_PRINTF("[ERRO] Falha ao conectar com o MT6701. Código do erro Wire: %d\n", erro);
+    //DEBUG_PRINTF(erro); // Se der 5 (timeout) ou 2 (NACK), a fiação está ruim
+    return false;
+  }
+}
+
 
 void checkThermalStatus() {
   uint32_t drv_status = driver.DRV_STATUS();
@@ -337,13 +358,13 @@ void broadcastStatus() {
   JsonDocument doc;
   doc["motorLigado"] = motorLigado;
 
-#if (defined(CONFIG_IDF_TARGET_ESP32C3) || defined(ARDUINO_ESP32C3_DEV))
-  doc["tonearmAngle"] = tonearm.angleRead();
-#elif (defined(CONFIG_IDF_TARGET_ESP32S3) || defined(ARDUINO_ESP32S3_DEV))
-  doc["tonearmAngle"] = tonearm.getAngleDegrees();
-#elif 0
-  doc["tonearmAngle"] = tonearm.angleRead();
-#endif
+//#if (defined(CONFIG_IDF_TARGET_ESP32C3) || defined(ARDUINO_ESP32C3_DEV))
+  doc["tonearmAngle"] = tonearmAngle;
+//#elif (defined(CONFIG_IDF_TARGET_ESP32S3) || defined(ARDUINO_ESP32S3_DEV))
+//  doc["tonearmAngle"] = tonearm.getAngleDegrees();
+//#elif 0
+//  doc["tonearmAngle"] = tonearm.angleRead();
+//#endif
 
   doc["manualOp"] = manualOperation;
 
@@ -439,6 +460,19 @@ void setup() {
   // digitalWrite(pinoPasso, LOW);
 
   DEBUG_PRINT("Pins...OK");
+
+
+  Wire.begin(tonearmPin_SDA,tonearmPin_SCL); // SDA, SCL
+
+#if (defined(CONFIG_IDF_TARGET_ESP32C3) || defined(ARDUINO_ESP32C3_DEV))
+  tonearm.initializeI2C(&Wire);
+#elif (defined(CONFIG_IDF_TARGET_ESP32S3) || defined(ARDUINO_ESP32S3_DEV))
+  tonearm.begin();
+#elif 0
+  tonearm.begin();
+#endif
+
+  DEBUG_PRINT("Tonearm...OK");
 
   // pixels.begin();           // Inicializa o NeoPixel
   // pixels.setBrightness(50); // 0-255, comece baixo para não ofuscar (50 é
@@ -675,17 +709,6 @@ void setup() {
   targetServoPos = posicaoLiftMax;
   // Serial.println("Início setup - antes de Wire");
 
-  // Wire.begin(tonearmPin_SDA,tonearmPin_SCL); // SDA, SCL
-
-#if (defined(CONFIG_IDF_TARGET_ESP32C3) || defined(ARDUINO_ESP32C3_DEV))
-  tonearm.initializeI2C(&Wire);
-#elif (defined(CONFIG_IDF_TARGET_ESP32S3) || defined(ARDUINO_ESP32S3_DEV))
-  tonearm.begin();
-#elif 0
-  tonearm.begin();
-#endif
-
-  DEBUG_PRINT("Tonearm...OK");
 
   // Serial.println("tonearm.begin OK");
   // setRPM(targetRPM);
@@ -757,17 +780,17 @@ void loop() {
                
                    wifiConectadoAnterior = wifiConectadoAgora;
                  */
-// float tonearmAngle = 0;
+
 //  acionar o motor conforme o angulo do braço
 #if (defined(CONFIG_IDF_TARGET_ESP32C3) || defined(ARDUINO_ESP32C3_DEV))
-  float tonearmAngle = tonearm.angleRead();
+  tonearmAngle = tonearm.angleRead();
 #elif (defined(CONFIG_IDF_TARGET_ESP32S3) || defined(ARDUINO_ESP32S3_DEV))
-  float tonearmAngle = tonearm.getAngleDegrees();
+  tonearmAngle = tonearm.getAngleDegrees();
 #elif 0
-  float tonearmAngle = tonearm.angleRead();
+  tonearmAngle = tonearm.angleRead();
 #endif
 
-  // DEBUG_PRINTF("angulo tonearm: %.1f\n", tonearmAngle); // Mantenha para
+  DEBUG_PRINTF("angulo tonearm: %.1f\n", tonearmAngle); // Mantenha para
   // debug
 
   if (!manualOperation) {
@@ -825,6 +848,12 @@ void loop() {
   }
 
   checkThermalStatus();
+
+  //if (verificarSensorMT6701()) {
+    // Código para continuar o funcionamento normal aqui...
+  //} else {
+  //  DEBUG_PRINT("Verifique os fios físicos do tonearm antes de prosseguir.");
+  //}
 
   // driver.microsteps(32);
   // uint16_t msread=driver.microsteps();
