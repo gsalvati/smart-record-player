@@ -17,6 +17,12 @@
     <h3>Posição Servo Baixado (liftMin)</h3>
     <input type="number" id="liftMin" step="0.1" value="120.0">
 
+    <h3>Ângulo Máximo do Braço (tonearmAngle max)</h3>
+    <input type="number" id="tonearmMax" step="0.1" min="0" max="180" value="160.0">
+
+    <h3>Ângulo Mínimo do Braço (tonearmAngle min)</h3>
+    <input type="number" id="tonearmMin" step="0.1" min="0" max="180" value="125.0">
+
     <h3>Tempo para ligar motor (debounce em segundos)</h3>
     <input type="number" id="debounceSec" step="0.1" min="0.5" max="10" value="2.0">
 
@@ -56,6 +62,8 @@
         fetch('/get_config').then(r => r.json()).then(data => {
             if (data.liftMax !== undefined) document.getElementById('liftMax').value = data.liftMax;
             if (data.liftMin !== undefined) document.getElementById('liftMin').value = data.liftMin;
+            if (data.tonearmMax !== undefined) document.getElementById('tonearmMax').value = data.tonearmMax;
+            if (data.tonearmMin !== undefined) document.getElementById('tonearmMin').value = data.tonearmMin;
             if (data.debounceSec !== undefined) document.getElementById('debounceSec').value = data.debounceSec;
             if (data.tempoSubida !== undefined) document.getElementById('tempoSubida').value = data.tempoSubida;
             if (data.tempoDescida !== undefined) document.getElementById('tempoDescida').value = data.tempoDescida;
@@ -64,10 +72,12 @@
         function salvar() {
             let liftMax = document.getElementById("liftMax").value;
             let liftMin = document.getElementById("liftMin").value;
+            let tonearmMax = document.getElementById("tonearmMax").value;
+            let tonearmMin = document.getElementById("tonearmMin").value;
             let debounceSec = document.getElementById("debounceSec").value;
             let tempoSubida = document.getElementById("tempoSubida").value;
             let tempoDescida = document.getElementById("tempoDescida").value;
-            fetch("/salvar?liftMax=" + liftMax + "&liftMin=" + liftMin + "&debounce=" + debounceSec + "&tempoSubida=" + tempoSubida + "&tempoDescida=" + tempoDescida)
+            fetch("/salvar?liftMax=" + liftMax + "&liftMin=" + liftMin + "&tonearmMax=" + tonearmMax + "&tonearmMin=" + tonearmMin + "&debounce=" + debounceSec + "&tempoSubida=" + tempoSubida + "&tempoDescida=" + tempoDescida)
                 .then(r => r.text()).then(txt => {
                     document.getElementById("status").innerText = txt;
                 });

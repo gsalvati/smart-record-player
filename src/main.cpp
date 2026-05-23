@@ -78,6 +78,8 @@ const unsigned long RAMP_INTERVAL_MS = 20; // atualiza a cada 20 ms
 float rampIncrementPerStep = 0;            // calculado quando inicia rampa
 bool isRamping = false;
 float tonearmAngle = 0;
+float tonearmAngleMax = 160.0;  // ângulo acima do qual o braço é considerado levantado
+float tonearmAngleMin = 125.0;  // ângulo abaixo do qual o final de disco é detectado
 
 static const int servoPin = 10;
 
@@ -462,18 +464,6 @@ void setup() {
   DEBUG_PRINT("Pins...OK");
 
 
-  Wire.begin(tonearmPin_SDA,tonearmPin_SCL); // SDA, SCL
-
-#if (defined(CONFIG_IDF_TARGET_ESP32C3) || defined(ARDUINO_ESP32C3_DEV))
-  tonearm.initializeI2C(&Wire);
-#elif (defined(CONFIG_IDF_TARGET_ESP32S3) || defined(ARDUINO_ESP32S3_DEV))
-  tonearm.begin();
-#elif 0
-  tonearm.begin();
-#endif
-
-  DEBUG_PRINT("Tonearm...OK");
-
   // pixels.begin();           // Inicializa o NeoPixel
   // pixels.setBrightness(50); // 0-255, comece baixo para não ofuscar (50 é
   // bom) pixels.clear();           // Apaga o LED no início
@@ -593,6 +583,8 @@ void setup() {
     String json = "{";
     json += "\"liftMax\":" + String(posicaoLiftMax, 1) + ",";
     json += "\"liftMin\":" + String(posicaoLiftMin, 1) + ",";
+    json += "\"tonearmMax\":" + String(tonearmAngleMax, 1) + ",";
+    json += "\"tonearmMin\":" + String(tonearmAngleMin, 1) + ",";
     json += "\"debounceSec\":" + String(DEBOUNCE_DELAY_MS / 1000.0, 2) + ",";
     json += "\"tempoDescida\":" + String(tempoDescidaLigarMs) + ",";
     json += "\"tempoSubida\":" + String(tempoSubidaDesligarMs);
@@ -602,30 +594,39 @@ void setup() {
 
   server.on("/salvar", []() {
     if (server.hasArg("liftMax") && server.hasArg("liftMin") &&
+        server.hasArg("tonearmMax") && server.hasArg("tonearmMin") &&
         server.hasArg("debounce") && server.hasArg("tempoDescida") && server.hasArg("tempoSubida")) {
       float newMax = server.arg("liftMax").toFloat();
       float newMin = server.arg("liftMin").toFloat();
+      float newTonearmMax = server.arg("tonearmMax").toFloat();
+      float newTonearmMin = server.arg("tonearmMin").toFloat();
       float newDebounceSec = server.arg("debounce").toFloat();
       unsigned long newTempoDescida = server.arg("tempoDescida").toInt();
       unsigned long newTempoSubida = server.arg("tempoSubida").toInt();
       if (newMax >= 0 && newMax <= 180 && newMin >= 0 && newMin <= 180 &&
-          newMax < newMin && newDebounceSec >= 0.5 && newDebounceSec <= 10.0 &&
+          newMax < newMin && newTonearmMin >= 0 && newTonearmMin <= 180 &&
+          newTonearmMax >= 0 && newTonearmMax <= 180 && newTonearmMin < newTonearmMax &&
+          newDebounceSec >= 0.5 && newDebounceSec <= 10.0 &&
           newTempoDescida >= 0 && newTempoSubida >= 0) {
         prefs.begin("config", false);
         prefs.putFloat("liftMax", newMax);
         prefs.putFloat("liftMin", newMin);
+        prefs.putFloat("tonearmAngleMax", newTonearmMax);
+        prefs.putFloat("tonearmAngleMin", newTonearmMin);
         prefs.putULong("debounceMs", (unsigned long)(newDebounceSec * 1000));
         prefs.putULong("tempoDescida", newTempoDescida);
         prefs.putULong("tempoSubida", newTempoSubida);
         prefs.end();
         posicaoLiftMax = newMax;
         posicaoLiftMin = newMin;
+        tonearmAngleMax = newTonearmMax;
+        tonearmAngleMin = newTonearmMin;
         DEBOUNCE_DELAY_MS = (unsigned long)(newDebounceSec * 1000);
         tempoDescidaLigarMs = newTempoDescida;
         tempoSubidaDesligarMs = newTempoSubida;
         telnet.printf(
-            "Config salva: liftMax=%.1f, liftMin=%.1f, debounce=%lu ms, descida=%lu ms, subida=%lu ms\n",
-            posicaoLiftMax, posicaoLiftMin, DEBOUNCE_DELAY_MS, tempoDescidaLigarMs, tempoSubidaDesligarMs);
+            "Config salva: liftMax=%.1f, liftMin=%.1f, tonearmMax=%.1f, tonearmMin=%.1f, debounce=%lu ms, descida=%lu ms, subida=%lu ms\n",
+            posicaoLiftMax, posicaoLiftMin, tonearmAngleMax, tonearmAngleMin, DEBOUNCE_DELAY_MS, tempoDescidaLigarMs, tempoSubidaDesligarMs);
         server.send(200, "text/plain", "Configurações salvas com sucesso!");
       } else {
         server.send(400, "text/plain",
@@ -690,6 +691,8 @@ void setup() {
   posicaoLiftMax =
       prefs.getFloat("liftMax", 80.0f); // default 80.0 se não existir
   posicaoLiftMin = prefs.getFloat("liftMin", 120.0f);       // default 120.0
+  tonearmAngleMax = prefs.getFloat("tonearmAngleMax", 160.0f); // default 160.0
+  tonearmAngleMin = prefs.getFloat("tonearmAngleMin", 125.0f); // default 125.0
   DEBOUNCE_DELAY_MS = prefs.getULong("debounceMs", 2000UL); // default 2000 ms
   manualOperation = prefs.getBool("manualOp", false);       // default false
   tempoDescidaLigarMs = prefs.getULong("tempoDescida", 1200UL);
@@ -700,8 +703,8 @@ void setup() {
   DEBUG_PRINT("Config load...OK");
 
   telnet.printf(
-      "Config carregada: liftMax=%.1f°, liftMin=%.1f°, debounce=%lu ms, descida=%lu ms, subida=%lu ms\n",
-      posicaoLiftMax, posicaoLiftMin, DEBOUNCE_DELAY_MS, tempoDescidaLigarMs, tempoSubidaDesligarMs);
+      "Config carregada: liftMax=%.1f°, liftMin=%.1f°, tonearmMax=%.1f°, tonearmMin=%.1f°, debounce=%lu ms, descida=%lu ms, subida=%lu ms\n",
+      posicaoLiftMax, posicaoLiftMin, tonearmAngleMax, tonearmAngleMin, DEBOUNCE_DELAY_MS, tempoDescidaLigarMs, tempoSubidaDesligarMs);
 
   // Atualiza posicaoServo inicial com o valor salvo
   posicaoServo = posicaoLiftMax;
@@ -710,6 +713,18 @@ void setup() {
   // Serial.println("Início setup - antes de Wire");
 
 
+
+Wire.begin(tonearmPin_SDA,tonearmPin_SCL); // SDA, SCL
+
+#if (defined(CONFIG_IDF_TARGET_ESP32C3) || defined(ARDUINO_ESP32C3_DEV))
+  tonearm.initializeI2C(&Wire);
+#elif (defined(CONFIG_IDF_TARGET_ESP32S3) || defined(ARDUINO_ESP32S3_DEV))
+  tonearm.begin();
+#elif 0
+  tonearm.begin();
+#endif
+
+  DEBUG_PRINT("Tonearm...OK");
   // Serial.println("tonearm.begin OK");
   // setRPM(targetRPM);
   // accelerateTo(targetRPM,3000);
@@ -794,10 +809,10 @@ void loop() {
   // debug
 
   if (!manualOperation) {
-    // Sempre resetar finalDisco quando o braço for levantado (>160°)
+    // Sempre resetar finalDisco quando o braço for levantado (> tonearmAngleMax)
     // Isso permite religar depois de um "fim de disco" se o usuário levantar e
     // abaixar novamente
-    if (tonearmAngle > 160.0) {
+    if (tonearmAngle > tonearmAngleMax) {
       if (finalDisco) {
         DEBUG_PRINT(
             "Braço levantado → resetando finalDisco para permitir novo play");
@@ -805,11 +820,11 @@ void loop() {
       }
     }
     // Lógica de DESLIGAR (imediata, sem debounce - segurança primeiro)
-    if (motorLigado && (tonearmAngle > 160.0 || tonearmAngle < 125.0)) {
+    if (motorLigado && (tonearmAngle > tonearmAngleMax || tonearmAngle < tonearmAngleMin)) {
       DEBUG_PRINT("angulo DESLIGANDO");
       toggleMotor(false);
 
-      if (tonearmAngle < 125.0) {
+      if (tonearmAngle < tonearmAngleMin) {
         DEBUG_PRINT("FINAL DISCO");
         finalDisco = true;
       }
@@ -819,10 +834,10 @@ void loop() {
       debounceLowAngleActive = false;
     }
 
-    // Lógica de LIGAR com debounce de 2s (só se ângulo <=160° e >=125° por
+    // Lógica de LIGAR com debounce de 2s (só se ângulo <= tonearmAngleMax e >= tonearmAngleMin por
     // tempo contínuo)
     else if (!motorLigado && !finalDisco) {
-      if (tonearmAngle <= 160.0 && tonearmAngle >= 125.0) {
+      if (tonearmAngle <= tonearmAngleMax && tonearmAngle >= tonearmAngleMin) {
         if (!debounceLowAngleActive) {
           // Começa a contar agora
           lowAngleStartTime = millis();
