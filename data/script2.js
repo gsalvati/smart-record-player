@@ -92,7 +92,7 @@ function updateUI(data) {
     //}
     if (tonearmGroup && data.tonearmAngle !== undefined) {
         // Mapear: 173.8° -> 0° (vertical), 125° -> ~-50.2° (apontando ao centro)
-        const visualAngle = map(data.tonearmAngle, 173.8, 125.0, 0, -50.2);
+        const visualAngle = map(data.tonearmAngle, 173.8, 125.0, 0, 50.2);
 
         // Clamp para evitar rotações inesperadas fora da faixa
         const clamped = Math.max(Math.min(visualAngle, 30), -70);
