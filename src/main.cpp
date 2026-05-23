@@ -805,7 +805,7 @@ void loop() {
   tonearmAngle = tonearm.angleRead();
 #endif
 
-  DEBUG_PRINTF("angulo tonearm: %.1f\n", tonearmAngle); // Mantenha para
+  //DEBUG_PRINTF("angulo tonearm: %.1f\n", tonearmAngle); // Mantenha para
   // debug
 
   if (!manualOperation) {

@@ -91,10 +91,19 @@ function updateUI(data) {
      //   tonearmAngleSpan.innerText = data.tonearmAngle.toFixed(1);
     //}
     if (tonearmGroup && data.tonearmAngle !== undefined) {
-        const visualAngle = map(data.tonearmAngle, 179, 125, -70, -20);
+        // Mapear: 173.8° -> 0° (vertical), 125° -> ~-50.2° (apontando ao centro)
+        const visualAngle = map(data.tonearmAngle, 173.8, 125.0, 0, -50.2);
 
-        //tonearm.setAttribute('transform', `rotate(${visualAngle} 445 155)`);
-        tonearmGroup.style.transform = `rotate(${visualAngle}deg)`;
+        // Clamp para evitar rotações inesperadas fora da faixa
+        const clamped = Math.max(Math.min(visualAngle, 30), -70);
+
+        tonearmGroup.style.transform = `rotate(${clamped}deg)`;
+    }
+
+    // Atualiza o elemento de exibição do ângulo em tempo real (index.html)
+    const tonearmAngleSpan = document.getElementById('tonearmAngleSpan');
+    if (tonearmAngleSpan && data.tonearmAngle !== undefined) {
+        tonearmAngleSpan.innerText = data.tonearmAngle.toFixed(1);
     }
 
     // Atualiza posição do servo (apenas se não estiver sendo modificado pelo usuário ativamente)
