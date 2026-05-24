@@ -9,49 +9,87 @@
 </head>
 
 <body>
-    <h1>Configurações - GIRA</h1>
+        <h1>Configurações - GIRA</h1>
 
-    <h3>Posição Servo Levantado (liftMax)</h3>
-    <input type="number" id="liftMax" step="0.1" value="80.0">
+        <div style="max-width:1000px; margin:0 auto; display:flex; gap:20px; align-items:flex-start;">
+            <!-- Vertical Tabs -->
+            <div id="configTabs" style="width:160px; background:transparent; display:flex; flex-direction:column; gap:8px;">
+                <button class="tabBtn active" data-section="liftSection" style="padding:12px; border-radius:8px; background:#222; color:#fff; border:1px solid #333; text-align:left;">Lift</button>
+                <button class="tabBtn" data-section="tonearmSection" style="padding:12px; border-radius:8px; background:#111; color:#ddd; border:1px solid #222; text-align:left;">Braço</button>
+                <button class="tabBtn" data-section="timingSection" style="padding:12px; border-radius:8px; background:#111; color:#ddd; border:1px solid #222; text-align:left;">Tempos</button>
+                <button class="tabBtn" data-section="filesSection" style="padding:12px; border-radius:8px; background:#111; color:#ddd; border:1px solid #222; text-align:left;">Arquivos</button>
+                <button class="tabBtn" data-section="allSections" style="padding:12px; border-radius:8px; background:#111; color:#ddd; border:1px solid #222; text-align:left;">Mostrar Tudo</button>
+            </div>
 
-    <h3>Posição Servo Baixado (liftMin)</h3>
-    <input type="number" id="liftMin" step="0.1" value="120.0">
+            <!-- Sections container -->
+            <div style="flex:1;">
+                <div id="liftSection" class="configSection" style="background:#1a1a1a; border:1px solid #333; border-radius:12px; padding:18px;">
+                    <h3 style="margin-top:0;">Lift (Servo)</h3>
+                    <p style="color:#aaa; margin:6px 0 12px 0;">Use o slider para ajustar visualmente; ajuste fino com o campo numérico.</p>
+                    <label style="display:block; color:#ccc;">Levantado (liftMax): <span id="liftMaxDisplay">80.0</span>°</label>
+                    <input type="range" id="liftMaxRange" min="0" max="180" step="0.1" value="80.0" style="width:100%;">
+                    <input type="number" id="liftMax" step="0.1" value="80.0" style="width:100%; margin-top:8px; background:#111; color:#fff; border:1px solid #333; padding:6px; border-radius:6px;">
 
-    <h3>Ângulo Máximo do Braço (tonearmAngle max)</h3>
-    <input type="number" id="tonearmMax" step="0.1" min="0" max="180" value="160.0">
+                    <hr style="border-color:#2a2a2a; margin:12px 0;">
 
-    <h3>Ângulo Mínimo do Braço (tonearmAngle min)</h3>
-    <input type="number" id="tonearmMin" step="0.1" min="0" max="180" value="125.0">
+                    <label style="display:block; color:#ccc;">Baixado (liftMin): <span id="liftMinDisplay">120.0</span>°</label>
+                    <input type="range" id="liftMinRange" min="0" max="180" step="0.1" value="120.0" style="width:100%;">
+                    <input type="number" id="liftMin" step="0.1" value="120.0" style="width:100%; margin-top:8px; background:#111; color:#fff; border:1px solid #333; padding:6px; border-radius:6px;">
+                </div>
 
-    <h3>Tempo para ligar motor (debounce em segundos)</h3>
-    <input type="number" id="debounceSec" step="0.1" min="0.5" max="10" value="2.0">
+                <div id="tonearmSection" class="configSection" style="display:none; margin-top:16px; background:#1a1a1a; border:1px solid #333; border-radius:12px; padding:18px;">
+                    <h3 style="margin-top:0;">Braço (Tonearm)</h3>
+                    <p style="color:#aaa; margin:6px 0 12px 0;">Defina os limites de ângulo que controlam ligar/desligar o motor.</p>
+                    <label style="display:block; color:#ccc;">Ângulo Máx (vertical): <span id="tonearmMaxDisplay">160.0</span>°</label>
+                    <input type="range" id="tonearmMaxRange" min="130" max="179" step="0.1" value="160.0" style="width:100%;">
+                    <input type="number" id="tonearmMax" step="0.1" min="0" max="180" value="160.0" style="width:100%; margin-top:8px; background:#111; color:#fff; border:1px solid #333; padding:6px; border-radius:6px;">
 
-    <h3>Tempo de subida ao desligar (ms)</h3>
-    <input type="number" id="tempoSubida" step="1" min="0" value="2400">
+                    <hr style="border-color:#2a2a2a; margin:12px 0;">
 
-    <h3>Tempo de descida ao ligar (ms)</h3>
-    <input type="number" id="tempoDescida" step="1" min="0" value="1200">
+                    <label style="display:block; color:#ccc;">Ângulo Mín (centro): <span id="tonearmMinDisplay">125.0</span>°</label>
+                    <input type="range" id="tonearmMinRange" min="90" max="160" step="0.1" value="125.0" style="width:100%;">
+                    <input type="number" id="tonearmMin" step="0.1" min="0" max="180" value="125.0" style="width:100%; margin-top:8px; background:#111; color:#fff; border:1px solid #333; padding:6px; border-radius:6px;">
+                </div>
 
-    <hr style="border-color:#333; margin:20px 0;">
-    <h3>Gerenciador de Arquivos (LittleFS)</h3>
-    <div id="fileList"
-        style="background:#1a1a1a; padding:10px; border-radius:5px; text-align:left; max-width:80%; margin:0 auto;">
-        <p>Carregando arquivos...</p>
-    </div>
-    <br>
-    <div style="background:#1a1a1a; padding:10px; border-radius:5px; text-align:center; max-width:80%; margin:0 auto;">
-        <input type="file" id="fileInput" style="margin-bottom:10px;">
-        <br>
-        <button class="btn" style="background:#2ecc71; color:white; padding:10px 20px; font-size:16px;"
-            onclick="uploadFile()">ENVIAR ARQUIVO</button>
-        <p id="uploadStatus"></p>
-    </div>
+                <div id="timingSection" class="configSection" style="display:none; margin-top:16px; background:#1a1a1a; border:1px solid #333; border-radius:12px; padding:18px;">
+                    <h3 style="margin-top:0;">Tempos & Debounce</h3>
+                    <p style="color:#aaa; margin:6px 0 12px 0;">Controles de temporização que afetam o comportamento automático.</p>
+                    <label style="display:block; color:#ccc;">Debounce (s): <span id="debounceDisplay">2.0</span>s</label>
+                    <input type="range" id="debounceRange" min="0.5" max="10" step="0.1" value="2.0" style="width:100%;">
+                    <input type="number" id="debounceSec" step="0.1" min="0.5" max="10" value="2.0" style="width:100%; margin-top:8px; background:#111; color:#fff; border:1px solid #333; padding:6px; border-radius:6px;">
 
-    <br><br>
-    <button class="btn btn-config" onclick="salvar()">SALVAR CONFIGURAÇÕES</button>
-    <br><br>
-    <button class="btn" style="background:#444; color:white;" onclick="location.href='/'">VOLTAR</button>
-    <br><br>
+                    <hr style="border-color:#2a2a2a; margin:12px 0;">
+
+                    <label style="display:block; color:#ccc;">Tempo de subida (ms): <span id="tempoSubidaDisplay">2400</span></label>
+                    <input type="range" id="tempoSubidaRange" min="0" max="5000" step="100" value="2400" style="width:100%;">
+                    <input type="number" id="tempoSubida" step="1" min="0" value="2400" style="width:100%; margin-top:8px; background:#111; color:#fff; border:1px solid #333; padding:6px; border-radius:6px;">
+
+                    <label style="display:block; color:#ccc; margin-top:10px;">Tempo de descida (ms): <span id="tempoDescidaDisplay">1200</span></label>
+                    <input type="range" id="tempoDescidaRange" min="0" max="5000" step="100" value="1200" style="width:100%;">
+                    <input type="number" id="tempoDescida" step="1" min="0" value="1200" style="width:100%; margin-top:8px; background:#111; color:#fff; border:1px solid #333; padding:6px; border-radius:6px;">
+                </div>
+
+                <div id="filesSection" class="configSection" style="display:none; margin-top:16px; background:#1a1a1a; border:1px solid #333; border-radius:12px; padding:18px;">
+                    <h3 style="margin-top:0;">Gerenciador de Arquivos (LittleFS)</h3>
+                    <div id="fileList" style="background:#1a1a1a; padding:10px; border-radius:5px; text-align:left; max-width:100%;">
+                        <p>Carregando arquivos...</p>
+                    </div>
+                    <br>
+                    <div style="background:#1a1a1a; padding:10px; border-radius:5px; text-align:center;">
+                        <input type="file" id="fileInput" style="margin-bottom:10px;">
+                        <br>
+                        <button class="btn" style="background:#2ecc71; color:white; padding:10px 20px; font-size:16px; margin-top:8px;" onclick="uploadFile()">ENVIAR ARQUIVO</button>
+                        <p id="uploadStatus"></p>
+                    </div>
+                </div>
+
+                <div style="display:flex; gap:12px; margin-top:18px;">
+                    <button class="btn btn-config" onclick="salvar()" style="flex:1;">SALVAR CONFIGURAÇÕES</button>
+                    <button class="btn" style="background:#444; color:white; padding:10px 16px; border-radius:8px;" onclick="location.href='/'">VOLTAR</button>
+                </div>
+            </div>
+        </div>
+
     <hr style="border-color:#2a2a2a; margin:0 auto; max-width:80%;">
     <br>
     <button class="btn" style="background:#1a1a2e; color:#aaa; border:1px solid #333;"
@@ -59,15 +97,58 @@
     <p id="status"></p>
 
     <script>
-        fetch('/get_config').then(r => r.json()).then(data => {
-            if (data.liftMax !== undefined) document.getElementById('liftMax').value = data.liftMax;
-            if (data.liftMin !== undefined) document.getElementById('liftMin').value = data.liftMin;
-            if (data.tonearmMax !== undefined) document.getElementById('tonearmMax').value = data.tonearmMax;
-            if (data.tonearmMin !== undefined) document.getElementById('tonearmMin').value = data.tonearmMin;
-            if (data.debounceSec !== undefined) document.getElementById('debounceSec').value = data.debounceSec;
-            if (data.tempoSubida !== undefined) document.getElementById('tempoSubida').value = data.tempoSubida;
-            if (data.tempoDescida !== undefined) document.getElementById('tempoDescida').value = data.tempoDescida;
-        });
+        // Sincroniza um par range <-> number e atualiza o display
+        function bindRangeNumber(rangeId, numId, displayId, fmt) {
+            const range = document.getElementById(rangeId);
+            const num = document.getElementById(numId);
+            const disp = document.getElementById(displayId);
+            if (!range || !num || !disp) return;
+            const updateDisplay = (v) => { disp.innerText = (fmt ? fmt(v) : v); };
+            range.addEventListener('input', () => { num.value = range.value; updateDisplay(range.value); });
+            num.addEventListener('input', () => { range.value = num.value; updateDisplay(num.value); });
+            // initialize
+            updateDisplay(num.value);
+        }
+
+        function fetchAndPopulate() {
+            fetch('/get_config').then(r => r.json()).then(data => {
+                if (data.liftMax !== undefined) {
+                    document.getElementById('liftMax').value = data.liftMax;
+                    document.getElementById('liftMaxRange').value = data.liftMax;
+                    document.getElementById('liftMaxDisplay').innerText = data.liftMax;
+                }
+                if (data.liftMin !== undefined) {
+                    document.getElementById('liftMin').value = data.liftMin;
+                    document.getElementById('liftMinRange').value = data.liftMin;
+                    document.getElementById('liftMinDisplay').innerText = data.liftMin;
+                }
+                if (data.tonearmMax !== undefined) {
+                    document.getElementById('tonearmMax').value = data.tonearmMax;
+                    document.getElementById('tonearmMaxRange').value = data.tonearmMax;
+                    document.getElementById('tonearmMaxDisplay').innerText = data.tonearmMax;
+                }
+                if (data.tonearmMin !== undefined) {
+                    document.getElementById('tonearmMin').value = data.tonearmMin;
+                    document.getElementById('tonearmMinRange').value = data.tonearmMin;
+                    document.getElementById('tonearmMinDisplay').innerText = data.tonearmMin;
+                }
+                if (data.debounceSec !== undefined) {
+                    document.getElementById('debounceSec').value = data.debounceSec;
+                    document.getElementById('debounceRange').value = data.debounceSec;
+                    document.getElementById('debounceDisplay').innerText = data.debounceSec;
+                }
+                if (data.tempoSubida !== undefined) {
+                    document.getElementById('tempoSubida').value = data.tempoSubida;
+                    document.getElementById('tempoSubidaRange').value = data.tempoSubida;
+                    document.getElementById('tempoSubidaDisplay').innerText = data.tempoSubida;
+                }
+                if (data.tempoDescida !== undefined) {
+                    document.getElementById('tempoDescida').value = data.tempoDescida;
+                    document.getElementById('tempoDescidaRange').value = data.tempoDescida;
+                    document.getElementById('tempoDescidaDisplay').innerText = data.tempoDescida;
+                }
+            }).catch(e => console.warn('Erro ao obter config', e));
+        }
 
         function salvar() {
             let liftMax = document.getElementById("liftMax").value;
@@ -80,6 +161,8 @@
             fetch("/salvar?liftMax=" + liftMax + "&liftMin=" + liftMin + "&tonearmMax=" + tonearmMax + "&tonearmMin=" + tonearmMin + "&debounce=" + debounceSec + "&tempoSubida=" + tempoSubida + "&tempoDescida=" + tempoDescida)
                 .then(r => r.text()).then(txt => {
                     document.getElementById("status").innerText = txt;
+                    // refresh displayed values
+                    fetchAndPopulate();
                 });
         }
 
@@ -114,7 +197,47 @@
             });
         }
 
-        loadFiles();
+        // Abas verticais: alterna visibilidade das seções
+        function showSection(name) {
+            const sections = ['liftSection','tonearmSection','timingSection','filesSection'];
+            if (name === 'allSections') {
+                sections.forEach(s => { const el = document.getElementById(s); if (el) el.style.display = ''; });
+            } else {
+                sections.forEach(s => { const el = document.getElementById(s); if (el) el.style.display = (s === name) ? '' : 'none'; });
+            }
+            // update active tab styles
+            document.querySelectorAll('#configTabs .tabBtn').forEach(btn => {
+                if (btn.dataset.section === name) {
+                    btn.classList.add('active'); btn.style.background = '#222'; btn.style.color = '#fff';
+                } else {
+                    btn.classList.remove('active'); btn.style.background = '#111'; btn.style.color = '#ddd';
+                }
+            });
+        }
+
+        // Hook tabs
+        document.querySelectorAll('#configTabs .tabBtn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const sec = btn.dataset.section;
+                showSection(sec);
+            });
+        });
+
+        // Inicializa bindings
+        (function initConfigUI(){
+            bindRangeNumber('liftMaxRange','liftMax','liftMaxDisplay',(v)=>parseFloat(v).toFixed(1));
+            bindRangeNumber('liftMinRange','liftMin','liftMinDisplay',(v)=>parseFloat(v).toFixed(1));
+            bindRangeNumber('tonearmMaxRange','tonearmMax','tonearmMaxDisplay',(v)=>parseFloat(v).toFixed(1));
+            bindRangeNumber('tonearmMinRange','tonearmMin','tonearmMinDisplay',(v)=>parseFloat(v).toFixed(1));
+            bindRangeNumber('debounceRange','debounceSec','debounceDisplay',(v)=>parseFloat(v).toFixed(1));
+            bindRangeNumber('tempoSubidaRange','tempoSubida','tempoSubidaDisplay',(v)=>parseInt(v));
+            bindRangeNumber('tempoDescidaRange','tempoDescida','tempoDescidaDisplay',(v)=>parseInt(v));
+
+            loadFiles();
+            fetchAndPopulate();
+            // default: show Lift section
+            showSection('liftSection');
+        })();
 
     </script>
 </body>
