@@ -76,7 +76,7 @@ function updateUI(data) {
         tonearmAngleSpan.innerText = data.tonearmAngle.toFixed(1);
     }
     if (tonearm && data.tonearmAngle !== undefined) {
-        const visualAngle = map(data.tonearmAngle, 179, 125, -70, -20);
+        const visualAngle = map(data.tonearmAngle, 179, 125, 0, -20);
 
         tonearm.setAttribute('transform', `rotate(${visualAngle} 445 155)`);
     }

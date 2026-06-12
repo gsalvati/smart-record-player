@@ -543,20 +543,20 @@ void setup() {
   if (WiFi.status() != WL_CONNECTED) {
     // Falhou ou não havia SSID. Inicia Access Point
     WiFi.mode(WIFI_AP);
-    WiFi.softAP("TocaDiscos_Setup");
+    WiFi.softAP("GIRA_Setup");
     isAPMode = true;
-    DEBUG_PRINT("Wifi falhou/ausente. Modo AP iniciado: TocaDiscos_Setup");
+    DEBUG_PRINT("Wifi falhou/ausente. Modo AP iniciado: GIRA_Setup");
     DEBUG_PRINT(WiFi.softAPIP().toString().c_str());
   } else {
     DEBUG_PRINT("Wifi...OK");
     DEBUG_PRINT(WiFi.localIP().toString().c_str());
 
     // Configuração OTA, Telnet e mDNS só em modo STA
-    ArduinoOTA.setHostname("TocaDiscos-Gian");
+    ArduinoOTA.setHostname("gira");
     telnet.begin(); // Inicia servidor Telnet na porta 23 padrão
     telnet.println("Use como Serial Monitor remoto.");
     DEBUG_PRINT("Telnet...OK");
-    MDNS.begin("tocadiscos");
+    MDNS.begin("gira");
   }
 
   // Rotas do Servidor

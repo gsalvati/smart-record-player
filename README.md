@@ -33,8 +33,8 @@ This repository contains the firmware for a **Smart Record Player** project base
 
 ### 5. Smart WiFi Setup (Access Point Mode)
 * **Zero Hardcoded Credentials**: WiFi SSID and password are never stored in the source code — credentials are saved securely in the ESP32's NVS (Non-Volatile Storage).
-* **Auto Access Point**: On first boot (or if the saved network is unreachable), the device automatically creates an open Wi-Fi hotspot named `TocaDiscos_Setup`.
-* **Captive Configuration Portal**: Connect to `TocaDiscos_Setup` and navigate to `http://192.168.4.1` — the device serves a setup page to enter your home Wi-Fi credentials. After saving, the ESP32 reboots and connects automatically.
+* **Auto Access Point**: On first boot (or if the saved network is unreachable), the device automatically creates an open Wi-Fi hotspot named `GIRA_Setup`.
+* **Captive Configuration Portal**: Connect to `GIRA_Setup` and navigate to `http://192.168.4.1` — the device serves a setup page to enter your home Wi-Fi credentials. After saving, the ESP32 reboots and connects automatically.
 * **Runtime Reconfiguration**: Once on your home network, the Wi-Fi settings can be updated anytime from the `config.html` page without reflashing the firmware.
 
 ### 6. Modern System and Connectivity
@@ -61,6 +61,6 @@ According to the project mapping:
 1. Clone the repository and open the root folder in an IDE with PlatformIO (such as VS Code).
 2. Make sure to run the **Upload Filesystem Image** task (in the PlatformIO menu) to send the `data/` folder containing the web interface and WiFi setup page to the ESP32's LittleFS.
 3. Run the **Build** and then **Upload** the application via cable.
-4. On first boot, the device will emit an open Wi-Fi network: **`TocaDiscos_Setup`**.
+4. On first boot, the device will emit an open Wi-Fi network: **`GIRA_Setup`**.
 5. Connect to it and open `http://192.168.4.1` in your browser to enter your home Wi-Fi credentials.
-6. After saving, the device will reboot and connect to your network. Access it at `http://tocadiscos.local` or by its assigned IP.
+6. After saving, the device will reboot and connect to your network. Access it at `http://gira.local` or by its assigned IP.

@@ -33,8 +33,8 @@ Este repositório contém o firmware de um projeto de **Toca-discos Inteligente 
 
 ### 5. Configuração Inteligente de WiFi (Modo Access Point)
 * **Sem Credenciais no Código**: O SSID e a senha do WiFi nunca ficam gravados no código-fonte — as credenciais são armazenadas de forma segura na memória NVS do ESP32.
-* **Access Point Automático**: Na primeira inicialização (ou se a rede salva estiver inacessível), o dispositivo cria automaticamente uma rede WiFi aberta chamada `TocaDiscos_Setup`.
-* **Portal de Configuração**: Conecte-se à rede `TocaDiscos_Setup` e acesse `http://192.168.4.1` — o dispositivo serve uma página para informar as credenciais da sua rede doméstica. Após salvar, o ESP32 reinicia e conecta automaticamente.
+* **Access Point Automático**: Na primeira inicialização (ou se a rede salva estiver inacessível), o dispositivo cria automaticamente uma rede WiFi aberta chamada `GIRA_Setup`.
+* **Portal de Configuração**: Conecte-se à rede `GIRA_Setup` e acesse `http://192.168.4.1` — o dispositivo serve uma página para informar as credenciais da sua rede doméstica. Após salvar, o ESP32 reinicia e conecta automaticamente.
 * **Reconfi guração em Tempo Real**: Já conectado à rede de casa, as configurações de WiFi podem ser alteradas a qualquer momento pela página `config.html`, sem necessidade de regravar o firmware.
 
 ### 6. Sistema Moderno e Conectividade
@@ -61,6 +61,6 @@ Conforme mapeamento do projeto:
 1. Clone o repositório e abra a pasta raiz em uma IDE com PlatformIO (como o VS Code).
 2. Certifique-se de executar a task **Upload Filesystem Image** (no menu PlatformIO) para enviar a pasta `data/` contendo a interface web e a página de configuração WiFi para o LittleFS do ESP32.
 3. Execute o **Build** e depois o **Upload** da aplicação via cabo.
-4. Na primeira inicialização, o dispositivo emitirá uma rede WiFi aberta chamada **`TocaDiscos_Setup`**.
+4. Na primeira inicialização, o dispositivo emitirá uma rede WiFi aberta chamada **`GIRA_Setup`**.
 5. Conecte-se a ela e abra `http://192.168.4.1` no navegador para informar as credenciais da sua rede de casa.
-6. Após salvar, o dispositivo reinicia e se conecta à sua rede. Acesse-o em `http://tocadiscos.local` ou pelo IP atribuído.
+6. Após salvar, o dispositivo reinicia e se conecta à sua rede. Acesse-o em `http://gira.local` ou pelo IP atribuído.

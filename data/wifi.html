@@ -199,7 +199,7 @@
         <p class="ap-info">
             Após salvar, o aparelho tentará conectar à rede informada.<br>
             Reconecte seu dispositivo à sua rede WiFi normal e acesse<br>
-            <strong>http://tocadiscos.local</strong>
+            <strong>http://gira.local</strong>
         </p>
     </div>
 
@@ -225,7 +225,7 @@
                 .then(r => {
                     if (r.ok) {
                         status.className = 'success';
-                        status.innerHTML = '✅ Salvo! O Toca-Discos está reiniciando.<br>Reconecte à sua rede WiFi e acesse <strong>http://tocadiscos.local</strong>';
+                        status.innerHTML = '✅ Salvo! O Toca-Discos está reiniciando.<br>Reconecte à sua rede WiFi e acesse <strong>http://gira.local</strong>';
                         btn.innerHTML = 'CONECTAR E SALVAR';
                         btn.disabled = false;
                     } else {
@@ -235,7 +235,7 @@
                 .catch(() => {
                     // Em modo AP, o ESP reinicia e corta a conexão — isso é esperado.
                     status.className = 'success';
-                    status.innerHTML = '✅ Salvo! O Toca-Discos está reiniciando.<br>Reconecte à sua rede WiFi e acesse <strong>http://tocadiscos.local</strong>';
+                    status.innerHTML = '✅ Salvo! O Toca-Discos está reiniciando.<br>Reconecte à sua rede WiFi e acesse <strong>http://gira.local</strong>';
                     btn.innerHTML = 'CONECTAR E SALVAR';
                     btn.disabled = false;
                 });

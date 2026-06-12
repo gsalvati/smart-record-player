@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tocadiscos-v2';
+const CACHE_NAME = 'gira-v2';
 const urlsToCache = [
   '/',
   '/index.html',
