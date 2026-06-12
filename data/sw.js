@@ -1,10 +1,13 @@
-const CACHE_NAME = 'gira-v2';
+const CACHE_NAME = 'gira-v3';
 const urlsToCache = [
   '/',
   '/index.html',
   '/config.html',
+  '/wifi.html',
   '/style.css',
-  '/script.js',
+  '/style2.css',
+  '/script2.js',
+  '/i18n.js',
   '/manifest.json'
 ];
 

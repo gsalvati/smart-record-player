@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TOCA-DISCOS - SVG</title>
   <link rel="manifest" href="manifest.json">
   <link rel="stylesheet" href="style2.css">
-  
+  <script src="i18n.js"></script>
 </head>
 <body>
 
@@ -28,7 +28,7 @@
         <circle cx="190" cy="190" r="105" fill="none" stroke="#1f1f1f" stroke-width="6"/>
         <circle cx="190" cy="190" r="92"  fill="none" stroke="#222" stroke-width="5"/>
         <circle cx="190" cy="190" r="78"  fill="none" stroke="#1f1f1f" stroke-width="4"/>
-        
+
         <!-- Centro do disco -->
         <circle cx="190" cy="190" r="28" fill="#0a0a0a"/>
         <circle cx="190" cy="190" r="18" fill="#333"/>
@@ -39,13 +39,13 @@
       <g id="tonearmGroup" style="transform-origin: 305px 95px;">
         <!-- Suporte do braço -->
         <rect x="290" y="65" width="28" height="45" rx="8" fill="#222" stroke="#444" stroke-width="6"/>
-        
+
         <!-- Braço principal -->
         <line x1="305" y1="95" x2="305" y2="240" stroke="#ff6600" stroke-width="11" stroke-linecap="round"/>
-        
+
         <!-- Cabeça do cartucho -->
         <polygon points="290,235 320,235 325,250 285,250" fill="#1a1a1a" stroke="#ff6a00" stroke-width="6"/>
-        
+
         <!-- Agulha -->
         <line x1="305" y1="250" x2="317" y2="267" stroke="#ddd" stroke-width="3" stroke-linecap="round"/>
       </g>
@@ -54,40 +54,40 @@
 
     <!-- Controles -->
     <div style="display: grid; grid-template-rows: 1fr 1fr; gap: 25px;">
-      
+
       <!-- Painel Motor & Rotação -->
       <div style="background:#1a1a1a; border:1px solid #333; border-radius:12px; padding:20px;">
-        <h3 style="margin-bottom:15px; color:#888; font-size:0.95rem; letter-spacing:1px;">MOTOR & ROTAÇÃO</h3>
-        
+        <h3 style="margin-bottom:15px; color:#888; font-size:0.95rem; letter-spacing:1px;" data-i18n="motor.section">MOTOR &amp; ROTATION</h3>
+
         <div style="display:flex; align-items:center; gap:15px; margin-bottom:18px;">
           <div id="motorToggle" style="width:60px; height:32px; background:#333; border-radius:50px; position:relative; cursor:pointer;">
             <div id="toggleKnob" style="position:absolute; top:3px; left:3px; width:26px; height:26px; background:white; border-radius:50%; transition:0.3s;"></div>
           </div>
           <div>
-            <div id="motorText" style="font-weight:600; color:#ff6a00;">LIGAR MOTOR</div>
-            <div style="font-size:0.82rem; color:#666;">DESLIGAR MOTOR</div>
+            <div id="motorText" style="font-weight:600; color:#ff6a00;" data-i18n="motor.turn_on">TURN ON MOTOR</div>
+            <div style="font-size:0.82rem; color:#666;" data-i18n="motor.turn_off_hint">TURN OFF MOTOR</div>
           </div>
         </div>
 
         <div style="display:flex; gap:0px;">
-        <button id="rpm33" class="rpm-btn active" style="border-top-right-radius: 0px;border-bottom-right-radius: 0px;">33⅓ RPM</button>
+          <button id="rpm33" class="rpm-btn active" style="border-top-right-radius: 0px;border-bottom-right-radius: 0px;">33⅓ RPM</button>
           <button id="rpm45" class="rpm-btn" style="border-top-left-radius: 0px;border-bottom-left-radius: 0px;">45 RPM</button>
         </div>
 
-        <!-- Novo: Modo Manual / Automático -->
+        <!-- Modo Manual / Automático -->
         <div class="mode-container">
-          <div class="mode-label">MODO DE FUNCIONAMENTO</div>
+          <div class="mode-label" data-i18n="mode.label">OPERATION MODE</div>
           <div style="display:flex; gap:10px;">
-            <button id="modeManual" class="mode-btn active">MANUAL</button>
-            <button id="modeAuto" class="mode-btn">AUTOMÁTICO</button>
+            <button id="modeManual" class="mode-btn active" data-i18n="mode.manual">MANUAL</button>
+            <button id="modeAuto" class="mode-btn" data-i18n="mode.auto">AUTOMATIC</button>
           </div>
         </div>
       </div>
 
       <!-- Controle do Lift -->
       <div style="background:#1a1a1a; border:1px solid #333; border-radius:12px; padding:20px;">
-        <h3 style="margin-bottom:15px; color:#888; font-size:0.95rem; letter-spacing:1px;">CONTROLE DO LIFT</h3>
-        
+        <h3 style="margin-bottom:15px; color:#888; font-size:0.95rem; letter-spacing:1px;" data-i18n="lift.section">LIFT CONTROL</h3>
+
         <div style="display:flex; gap:12px; margin-bottom:15px;">
           <button id="liftUp"   style="flex:1; height:55px; font-size:1.8rem; border:none; border-radius:12px; background:#222; color:white;">↑</button>
           <button id="liftDown" style="flex:1; height:55px; font-size:1.8rem; border:none; border-radius:12px; background:#222; color:#aaa;">↓</button>
@@ -96,15 +96,15 @@
         <div>
           <input type="range" id="liftSlider" min="30" max="150" value="91" style="width:100%; accent-color:#ff6a00;">
           <div style="text-align:center; margin-top:8px; font-size:0.9rem; color:#888;">
-            Posição atual: <span id="liftValue">91°</span>
+            <span data-i18n="lift.position">Current position:</span> <span id="liftValue">91°</span>
           </div>
         </div>
       </div>
     </div>
 
     <div style="text-align:center; margin-top:30px;">
-      <button id="advancedBtn" style="background:#3498db; color:white; border:none; padding:14px 36px; border-radius:8px; font-weight:600; cursor:pointer;">
-        ⚙️ CONFIGURAÇÕES AVANÇADAS
+      <button id="advancedBtn" style="background:#3498db; color:white; border:none; padding:14px 36px; border-radius:8px; font-weight:600; cursor:pointer;" data-i18n="btn.advanced">
+        ⚙️ ADVANCED SETTINGS
       </button>
     </div>
   </div>

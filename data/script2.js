@@ -65,14 +65,14 @@ function updateUI(data) {
             isSpinning = true;
             motorToggle.style.background = '#2ecc71';
             toggleKnob.style.transform = 'translateX(28px)';
-            motorText.textContent = 'DESLIGAR MOTOR';
+            motorText.textContent = t('motor.turn_off');
             discGroup.classList.add('spinning');
             updateSpinSpeed();
         } else {
             isSpinning = false;
             motorToggle.style.background = '#333';
             toggleKnob.style.transform = 'translateX(0)';
-              motorText.textContent = 'LIGAR MOTOR';
+            motorText.textContent = t('motor.turn_on');
             discGroup.classList.remove('spinning');
             updateSpinSpeed();
         }

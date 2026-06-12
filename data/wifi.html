@@ -1,10 +1,11 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="en">
 
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Configuração WiFi - GIRA</title>
+    <title data-i18n="wifi.heading">WiFi Configuration - GIRA</title>
+    <script src="i18n.js"></script>
     <style>
         * {
             box-sizing: border-box;
@@ -181,24 +182,25 @@
 <body>
     <div class="card">
         <div class="icon">📻</div>
-        <h1>Configuração WiFi</h1>
-        <p class="subtitle">Conecte o Toca-Discos à sua rede doméstica.<br>Após salvar, o dispositivo irá reiniciar.</p>
+        <h1 data-i18n="wifi.heading">WiFi Configuration</h1>
+        <p class="subtitle" data-i18n-html="wifi.subtitle">Connect the Record Player to your home network.<br>After saving, the device will restart.</p>
 
-        <label for="ssid">Nome da Rede (SSID)</label>
-        <input type="text" id="ssid" placeholder="Ex: MinhaRede" autocomplete="off" autocorrect="off"
+        <label for="ssid" data-i18n="wifi.ssid_label">Network Name (SSID)</label>
+        <input type="text" id="ssid" data-i18n-placeholder="wifi.ssid_ph"
+            placeholder="E.g.: MyNetwork" autocomplete="off" autocorrect="off"
             autocapitalize="off" spellcheck="false">
 
-        <label for="pass">Senha da Rede</label>
-        <input type="password" id="pass" placeholder="Senha do WiFi">
+        <label for="pass" data-i18n="wifi.pass_label">Network Password</label>
+        <input type="password" id="pass" data-i18n-placeholder="wifi.pass_ph" placeholder="WiFi Password">
 
-        <button class="btn" id="btnSalvar" onclick="salvarWifi()">CONECTAR E SALVAR</button>
+        <button class="btn" id="btnSalvar" onclick="salvarWifi()" data-i18n="wifi.btn_connect">CONNECT AND SAVE</button>
 
         <div id="status"></div>
 
         <hr class="divider">
-        <p class="ap-info">
-            Após salvar, o aparelho tentará conectar à rede informada.<br>
-            Reconecte seu dispositivo à sua rede WiFi normal e acesse<br>
+        <p class="ap-info" data-i18n-html="wifi.footer">
+            After saving, the device will try to connect to the given network.<br>
+            Reconnect your device to your regular WiFi and access<br>
             <strong>http://gira.local</strong>
         </p>
     </div>
@@ -212,36 +214,35 @@
 
             if (!ssid) {
                 status.className = 'error';
-                status.textContent = '⚠️ Por favor informe o nome da rede (SSID).';
+                status.textContent = t('wifi.no_ssid');
                 return;
             }
 
             btn.disabled = true;
-            btn.innerHTML = '<span class="spinner"></span>Salvando...';
+            btn.innerHTML = '<span class="spinner"></span>' + t('wifi.btn_saving');
             status.className = 'info';
-            status.textContent = '⏳ Salvando credenciais e reiniciando...';
+            status.textContent = t('wifi.info');
 
             fetch('/save_wifi?ssid=' + encodeURIComponent(ssid) + '&pass=' + encodeURIComponent(pass))
                 .then(r => {
                     if (r.ok) {
                         status.className = 'success';
-                        status.innerHTML = '✅ Salvo! O Toca-Discos está reiniciando.<br>Reconecte à sua rede WiFi e acesse <strong>http://gira.local</strong>';
-                        btn.innerHTML = 'CONECTAR E SALVAR';
+                        status.innerHTML = t('wifi.saved');
+                        btn.textContent = t('wifi.btn_connect');
                         btn.disabled = false;
                     } else {
-                        throw new Error('Erro');
+                        throw new Error('error');
                     }
                 })
                 .catch(() => {
-                    // Em modo AP, o ESP reinicia e corta a conexão — isso é esperado.
+                    // In AP mode, the ESP reboots and cuts the connection — this is expected.
                     status.className = 'success';
-                    status.innerHTML = '✅ Salvo! O Toca-Discos está reiniciando.<br>Reconecte à sua rede WiFi e acesse <strong>http://gira.local</strong>';
-                    btn.innerHTML = 'CONECTAR E SALVAR';
+                    status.innerHTML = t('wifi.saved');
+                    btn.textContent = t('wifi.btn_connect');
                     btn.disabled = false;
                 });
         }
 
-        // Permite submeter com Enter
         document.addEventListener('keydown', function (e) {
             if (e.key === 'Enter') salvarWifi();
         });
