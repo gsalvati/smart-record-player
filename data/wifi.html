@@ -7,11 +7,7 @@
     <title data-i18n="wifi.heading">WiFi Configuration - GIRA</title>
     <script src="i18n.js"></script>
     <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
 
         body {
             background: #0f0f0f;
@@ -31,15 +27,11 @@
             border-radius: 14px;
             padding: 36px 32px;
             width: 100%;
-            max-width: 420px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            max-width: 440px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
         }
 
-        .icon {
-            font-size: 48px;
-            text-align: center;
-            margin-bottom: 8px;
-        }
+        .icon { font-size: 48px; text-align: center; margin-bottom: 8px; }
 
         h1 {
             font-size: 22px;
@@ -53,8 +45,99 @@
             font-size: 13px;
             color: #777;
             text-align: center;
-            margin-bottom: 28px;
+            margin-bottom: 24px;
             line-height: 1.5;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .section-label {
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            color: #666;
+            text-transform: uppercase;
+        }
+
+        .btn-refresh {
+            background: none;
+            border: 1px solid #333;
+            border-radius: 6px;
+            color: #aaa;
+            font-size: 13px;
+            padding: 4px 10px;
+            cursor: pointer;
+            transition: border-color 0.2s, color 0.2s;
+        }
+        .btn-refresh:hover { border-color: #ff6a00; color: #ff6a00; }
+
+        .network-list {
+            border: 1px solid #2a2a2a;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 20px;
+            max-height: 220px;
+            overflow-y: auto;
+        }
+
+        .network-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 11px 14px;
+            background: #111;
+            cursor: pointer;
+            border-bottom: 1px solid #1e1e1e;
+            transition: background 0.15s, border-color 0.15s;
+            border-left: 3px solid transparent;
+        }
+        .network-item:last-child { border-bottom: none; }
+        .network-item:hover { background: #181818; }
+        .network-item.selected {
+            background: rgba(255,106,0,0.08);
+            border-left-color: #ff6a00;
+        }
+
+        .network-name {
+            font-size: 14px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            flex: 1;
+            margin-right: 10px;
+        }
+
+        .network-meta {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .signal-bars {
+            display: flex;
+            gap: 2px;
+            align-items: flex-end;
+            height: 14px;
+        }
+        .signal-bars span {
+            width: 4px;
+            border-radius: 1px;
+            display: block;
+        }
+
+        .lock-icon { font-size: 11px; color: #888; }
+
+        .notice {
+            font-size: 12px;
+            color: #666;
+            text-align: center;
+            padding: 14px;
         }
 
         label {
@@ -66,7 +149,6 @@
             letter-spacing: 0.5px;
         }
 
-        input[type="text"],
         input[type="password"] {
             width: 100%;
             background: #111;
@@ -79,11 +161,7 @@
             outline: none;
             transition: border-color 0.2s;
         }
-
-        input[type="text"]:focus,
-        input[type="password"]:focus {
-            border-color: #e67e22;
-        }
+        input[type="password"]:focus { border-color: #e67e22; }
 
         .btn {
             width: 100%;
@@ -99,20 +177,9 @@
             transition: opacity 0.2s, transform 0.1s;
             margin-top: 4px;
         }
-
-        .btn:hover {
-            opacity: 0.9;
-        }
-
-        .btn:active {
-            transform: scale(0.98);
-        }
-
-        .btn-secondary {
-            background: #2a2a2a;
-            margin-top: 12px;
-            color: #aaa;
-        }
+        .btn:hover { opacity: 0.9; }
+        .btn:active { transform: scale(0.98); }
+        .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
 
         #status {
             margin-top: 18px;
@@ -123,47 +190,38 @@
             padding: 10px;
             display: none;
         }
-
         #status.success {
             display: block;
-            background: rgba(46, 204, 113, 0.12);
+            background: rgba(46,204,113,0.12);
             color: #2ecc71;
-            border: 1px solid rgba(46, 204, 113, 0.3);
+            border: 1px solid rgba(46,204,113,0.3);
         }
-
         #status.error {
             display: block;
-            background: rgba(231, 76, 60, 0.12);
+            background: rgba(231,76,60,0.12);
             color: #e74c3c;
-            border: 1px solid rgba(231, 76, 60, 0.3);
+            border: 1px solid rgba(231,76,60,0.3);
         }
-
         #status.info {
             display: block;
-            background: rgba(52, 152, 219, 0.12);
+            background: rgba(52,152,219,0.12);
             color: #3498db;
-            border: 1px solid rgba(52, 152, 219, 0.3);
+            border: 1px solid rgba(52,152,219,0.3);
         }
 
-        .divider {
-            border: none;
-            border-top: 1px solid #2a2a2a;
-            margin: 20px 0;
-        }
+        .divider { border: none; border-top: 1px solid #2a2a2a; margin: 20px 0; }
 
         .ap-info {
             font-size: 12px;
             color: #555;
             text-align: center;
-            margin-top: 16px;
             line-height: 1.6;
         }
 
         .spinner {
             display: inline-block;
-            width: 14px;
-            height: 14px;
-            border: 2px solid rgba(255, 255, 255, 0.3);
+            width: 14px; height: 14px;
+            border: 2px solid rgba(255,255,255,0.3);
             border-top-color: #fff;
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
@@ -171,11 +229,11 @@
             vertical-align: middle;
         }
 
-        @keyframes spin {
-            to {
-                transform: rotate(360deg);
-            }
-        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: #111; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
     </style>
 </head>
 
@@ -183,17 +241,26 @@
     <div class="card">
         <div class="icon">📻</div>
         <h1 data-i18n="wifi.heading">WiFi Configuration</h1>
-        <p class="subtitle" data-i18n-html="wifi.subtitle">Connect the Record Player to your home network.<br>After saving, the device will restart.</p>
+        <p class="subtitle" data-i18n-html="wifi.subtitle">
+            Connect the Record Player to your home network.<br>After saving, the device will restart.
+        </p>
 
-        <label for="ssid" data-i18n="wifi.ssid_label">Network Name (SSID)</label>
-        <input type="text" id="ssid" data-i18n-placeholder="wifi.ssid_ph"
-            placeholder="E.g.: MyNetwork" autocomplete="off" autocorrect="off"
-            autocapitalize="off" spellcheck="false">
+        <!-- Network list -->
+        <div class="section-header">
+            <span class="section-label" data-i18n="wifi.networks">Available Networks</span>
+            <button class="btn-refresh" id="btnRefresh" onclick="scanNetworks()" data-i18n="wifi.scan_refresh">↻ Refresh</button>
+        </div>
+        <div class="network-list" id="networkList">
+            <p class="notice" data-i18n="wifi.scan_loading">Scanning networks...</p>
+        </div>
 
+        <!-- Password -->
         <label for="pass" data-i18n="wifi.pass_label">Network Password</label>
         <input type="password" id="pass" data-i18n-placeholder="wifi.pass_ph" placeholder="WiFi Password">
 
-        <button class="btn" id="btnSalvar" onclick="salvarWifi()" data-i18n="wifi.btn_connect">CONNECT AND SAVE</button>
+        <button class="btn" id="btnSalvar" onclick="salvarWifi()" data-i18n="wifi.btn_connect">
+            CONNECT AND SAVE
+        </button>
 
         <div id="status"></div>
 
@@ -206,15 +273,119 @@
     </div>
 
     <script>
+        let selectedSSID = null;
+
+        // ── Signal strength bars ────────────────────────────────────────────
+        function signalBars(rssi) {
+            const level  = rssi >= -50 ? 4 : rssi >= -65 ? 3 : rssi >= -75 ? 2 : 1;
+            const color  = level >= 3 ? '#2ecc71' : level >= 2 ? '#f39c12' : '#e74c3c';
+            const heights = [4, 7, 11, 14];
+            const el = document.createElement('div');
+            el.className = 'signal-bars';
+            heights.forEach((h, i) => {
+                const bar = document.createElement('span');
+                bar.style.height = h + 'px';
+                bar.style.background = i < level ? color : '#3a3a3a';
+                el.appendChild(bar);
+            });
+            return el;
+        }
+
+        // ── Render network list ─────────────────────────────────────────────
+        function renderNetworks(networks) {
+            const list = document.getElementById('networkList');
+            list.innerHTML = '';
+
+            if (!networks || networks.length === 0) {
+                const p = document.createElement('p');
+                p.className = 'notice';
+                p.textContent = t('wifi.scan_none');
+                list.appendChild(p);
+                return;
+            }
+
+            // Deduplicate: keep strongest signal per SSID
+            const seen = {};
+            networks.forEach(n => {
+                if (!seen[n.ssid] || n.rssi > seen[n.ssid].rssi) seen[n.ssid] = n;
+            });
+            const unique = Object.values(seen).sort((a, b) => b.rssi - a.rssi);
+
+            unique.forEach(net => {
+                const item = document.createElement('div');
+                item.className = 'network-item';
+
+                const name = document.createElement('div');
+                name.className = 'network-name';
+                name.textContent = net.ssid;
+
+                const meta = document.createElement('div');
+                meta.className = 'network-meta';
+                if (net.enc) {
+                    const lock = document.createElement('span');
+                    lock.className = 'lock-icon';
+                    lock.textContent = '🔒';
+                    meta.appendChild(lock);
+                }
+                meta.appendChild(signalBars(net.rssi));
+
+                item.appendChild(name);
+                item.appendChild(meta);
+                item.addEventListener('click', () => selectNetwork(item, net.ssid));
+                list.appendChild(item);
+            });
+        }
+
+        // ── Select a network ────────────────────────────────────────────────
+        function selectNetwork(el, ssid) {
+            selectedSSID = ssid;
+            document.querySelectorAll('.network-item').forEach(item => {
+                item.classList.toggle('selected', item === el);
+            });
+            document.getElementById('pass').focus();
+            // Clear any previous error
+            const status = document.getElementById('status');
+            if (status.classList.contains('error')) status.className = '';
+        }
+
+        // ── Scan ────────────────────────────────────────────────────────────
+        function scanNetworks() {
+            selectedSSID = null;
+            const list = document.getElementById('networkList');
+            list.innerHTML = '';
+            const p = document.createElement('p');
+            p.className = 'notice';
+            p.textContent = t('wifi.scan_loading');
+            list.appendChild(p);
+
+            document.getElementById('btnRefresh').disabled = true;
+
+            fetch('/scan_wifi')
+                .then(r => r.json())
+                .then(data => {
+                    renderNetworks(data);
+                    document.getElementById('btnRefresh').disabled = false;
+                })
+                .catch(() => {
+                    list.innerHTML = '';
+                    const err = document.createElement('p');
+                    err.className = 'notice';
+                    err.style.color = '#e74c3c';
+                    err.textContent = t('wifi.scan_error');
+                    list.appendChild(err);
+                    document.getElementById('btnRefresh').disabled = false;
+                });
+        }
+
+        // ── Save & connect ──────────────────────────────────────────────────
         function salvarWifi() {
-            const ssid = document.getElementById('ssid').value.trim();
-            const pass = document.getElementById('pass').value;
-            const btn = document.getElementById('btnSalvar');
+            const pass   = document.getElementById('pass').value;
+            const btn    = document.getElementById('btnSalvar');
             const status = document.getElementById('status');
 
-            if (!ssid) {
+            if (!selectedSSID) {
                 status.className = 'error';
-                status.textContent = t('wifi.no_ssid');
+                status.textContent = t('wifi.select_first');
                 return;
             }
 
@@ -223,7 +394,7 @@
             status.className = 'info';
             status.textContent = t('wifi.info');
 
-            fetch('/save_wifi?ssid=' + encodeURIComponent(ssid) + '&pass=' + encodeURIComponent(pass))
+            fetch('/save_wifi?ssid=' + encodeURIComponent(selectedSSID) + '&pass=' + encodeURIComponent(pass))
                 .then(r => {
                     if (r.ok) {
                         status.className = 'success';
@@ -235,7 +406,7 @@
                     }
                 })
                 .catch(() => {
-                    // In AP mode, the ESP reboots and cuts the connection — this is expected.
+                    // In AP mode the ESP reboots and drops the connection — expected.
                     status.className = 'success';
                     status.innerHTML = t('wifi.saved');
                     btn.textContent = t('wifi.btn_connect');
@@ -243,9 +414,10 @@
                 });
         }
 
-        document.addEventListener('keydown', function (e) {
-            if (e.key === 'Enter') salvarWifi();
-        });
+        document.addEventListener('keydown', e => { if (e.key === 'Enter') salvarWifi(); });
+
+        // Auto-scan on load (after i18n is applied by DOMContentLoaded in i18n.js)
+        document.addEventListener('DOMContentLoaded', () => scanNetworks());
     </script>
 </body>
 

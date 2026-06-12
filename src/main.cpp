@@ -542,7 +542,8 @@ void setup() {
 
   if (WiFi.status() != WL_CONNECTED) {
     // Falhou ou não havia SSID. Inicia Access Point
-    WiFi.mode(WIFI_AP);
+    // WIFI_AP_STA mantém a interface STA ativa para permitir scan de redes
+    WiFi.mode(WIFI_AP_STA);
     WiFi.softAP("GIRA_Setup");
     isAPMode = true;
     DEBUG_PRINT("Wifi falhou/ausente. Modo AP iniciado: GIRA_Setup");
@@ -663,6 +664,22 @@ void setup() {
     }
     server.streamFile(file, "text/html");
     file.close();
+  });
+
+  server.on("/scan_wifi", HTTP_GET, []() {
+    int n = WiFi.scanNetworks();
+    JsonDocument doc;
+    JsonArray arr = doc.to<JsonArray>();
+    for (int i = 0; i < n; i++) {
+      JsonObject net = arr.add<JsonObject>();
+      net["ssid"] = WiFi.SSID(i);
+      net["rssi"] = WiFi.RSSI(i);
+      net["enc"]  = (WiFi.encryptionType(i) != WIFI_AUTH_OPEN) ? 1 : 0;
+    }
+    WiFi.scanDelete();
+    String json;
+    serializeJson(doc, json);
+    server.send(200, "application/json", json);
   });
 
   DEBUG_PRINT("Server routes...OK");

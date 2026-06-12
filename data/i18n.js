@@ -57,6 +57,14 @@ const translations = {
     // language switcher
     'lang.label': 'Language',
 
+    // wifi.html - scan
+    'wifi.networks':      'Available Networks',
+    'wifi.scan_refresh':  '↻ Refresh',
+    'wifi.scan_loading':  'Scanning networks...',
+    'wifi.scan_error':    'Scan failed. Try again.',
+    'wifi.scan_none':     'No networks found.',
+    'wifi.select_first':  '⚠️ Please select a network.',
+
     // wifi.html
     'wifi.heading':     'WiFi Configuration',
     'wifi.subtitle':    'Connect the Record Player to your home network.<br>After saving, the device will restart.',
@@ -114,6 +122,13 @@ const translations = {
     'btn.back': 'VOLTAR',
     'btn.wifi': '⚙️ ALTERAR REDE WIFI',
     'lang.label': 'Idioma',
+
+    'wifi.networks':      'Redes Disponíveis',
+    'wifi.scan_refresh':  '↻ Atualizar',
+    'wifi.scan_loading':  'Buscando redes...',
+    'wifi.scan_error':    'Falha no scan. Tente novamente.',
+    'wifi.scan_none':     'Nenhuma rede encontrada.',
+    'wifi.select_first':  '⚠️ Por favor selecione uma rede.',
     'wifi.heading':     'Configuração WiFi',
     'wifi.subtitle':    'Conecte o Toca-Discos à sua rede doméstica.<br>Após salvar, o dispositivo irá reiniciar.',
     'wifi.ssid_label':  'Nome da Rede (SSID)',
@@ -170,6 +185,12 @@ const translations = {
     'btn.back': 'VOLVER',
     'btn.wifi': '⚙️ CAMBIAR RED WIFI',
     'lang.label': 'Idioma',
+    'wifi.networks':      'Redes Disponibles',
+    'wifi.scan_refresh':  '↻ Actualizar',
+    'wifi.scan_loading':  'Buscando redes...',
+    'wifi.scan_error':    'Error en el scan. Intente de nuevo.',
+    'wifi.scan_none':     'No se encontraron redes.',
+    'wifi.select_first':  '⚠️ Por favor seleccione una red.',
     'wifi.heading':     'Configuración WiFi',
     'wifi.subtitle':    'Conecte el Toca-Discos a su red doméstica.<br>Tras guardar, el dispositivo se reiniciará.',
     'wifi.ssid_label':  'Nombre de Red (SSID)',
