@@ -195,19 +195,16 @@ function updateUI(data) {
 
 function toggleMotor() {
     // Feedback visual imediato antes de confirmar do servidor
-    const wasSpinning = isSpinning;
     isSpinning = !isSpinning;
     updateMotorVisualState();
     
     sendCmd({ cmd: "toggle" });
 }
 
-function toggleOper() {
-    const newMode = isManual ? "auto" : "manual";
-    isManual = !isManual;
+function setOperMode(manual) {
+    isManual = manual;
     updateModeVisualState();
-    
-    sendCmd({ cmd: "oper", val: newMode });
+    sendCmd({ cmd: "oper", val: manual ? "manual" : "auto" });
 }
 
 function setRPM(val) {
@@ -275,12 +272,10 @@ window.onload = function() {
 
     // modo de operação
     modeManual.addEventListener('click', () => {
-        isManual = true;
-        toggleOper();
+        setOperMode(true);
     });
     modeAuto.addEventListener('click', () => {
-        isManual = false;
-        toggleOper();
+        setOperMode(false);
     });
 
     // controle do motor
