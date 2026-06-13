@@ -94,6 +94,9 @@ bool finalDisco = false;
 
 unsigned long tempoDescidaLigarMs = 1200;
 unsigned long tempoSubidaDesligarMs = 2400;
+bool motorShutdownActive = false;
+unsigned long motorShutdownTime = 0;
+float motorShutdownDelayMs = 3000.0f;
 
 bool manualOperation = false;
 
@@ -153,6 +156,23 @@ bool motorStartupActive = false;
 
 bool atualizando = false;
 
+// Pulse width range for the servo — adjust if your servo has a different range.
+// Common micro servos: 500–2500 µs (≈ 0.09° per µs → ~0.1° resolution).
+static const int SERVO_MIN_US = 500;
+static const int SERVO_MAX_US = 2500;
+
+// Writes a fractional degree value using microseconds instead of integer degrees.
+// oServo.write(int) truncates to whole degrees; this gives sub-degree resolution.
+inline void writeServoAngle(float deg) {
+  int us = (int)roundf(SERVO_MIN_US + (deg / 180.0f) * (SERVO_MAX_US - SERVO_MIN_US));
+  oServo.writeMicroseconds(constrain(us, SERVO_MIN_US, SERVO_MAX_US));
+}
+
+// Smoothstep ease-in/ease-out: gentle acceleration and deceleration.
+inline float easeInOut(float t) {
+  return t * t * (3.0f - 2.0f * t);
+}
+
 void moveServo(float angle, unsigned long time, bool hold) {
 #if (defined(CONFIG_IDF_TARGET_ESP32C3) || defined(ARDUINO_ESP32C3_DEV))
   targetServoPos = angle;
@@ -162,7 +182,7 @@ void moveServo(float angle, unsigned long time, bool hold) {
   if (time == 0) {
     currentServoPos = angle;
     posicaoServo = currentServoPos;
-    oServo.write(currentServoPos);
+    writeServoAngle(currentServoPos);
   }
 #elif (defined(CONFIG_IDF_TARGET_ESP32S3) || defined(ARDUINO_ESP32S3_DEV))
   oServo.moveTo(angle, time, hold);
@@ -277,6 +297,9 @@ void toggleMotor(bool ligar = false) {
     digitalWrite(pinoEnable, HIGH);
   }
   if (ligar) {
+    // Cancela shutdown pendente se estiver ligando
+    motorShutdownActive = false;
+
     posicaoServo = posicaoLiftMin;
     moveServo(posicaoServo, tempoDescidaLigarMs, true);
     posicaoLift = false;
@@ -290,12 +313,16 @@ void toggleMotor(bool ligar = false) {
     motorStartupActive = true;
 
   } else {
+    // Cancela startup pendente se estiver desligando
+    motorStartupActive = false;
+
     posicaoServo = posicaoLiftMax;
     moveServo(posicaoServo, tempoSubidaDesligarMs, false);
     posicaoLift = true;
-    delay(3000);
-    // desliga motor
-    setRPM(0);
+
+    // Inicia timer NÃO-BLOQUEANTE para desligar o motor após o servo subir
+    motorShutdownActive = true;
+    motorShutdownTime = millis();
   }
   motorLigado = !motorLigado;
 }
@@ -756,26 +783,31 @@ void loop() {
     motorStartupActive = false;
   }
 
+  // Desliga o motor após o tempo de subida do servo (não-bloqueante)
+  if (motorShutdownActive && (millis() - motorShutdownTime >= motorShutdownDelayMs)) {
+    setRPM(0);
+    motorShutdownActive = false;
+  }
+
 #if (defined(CONFIG_IDF_TARGET_ESP32C3) || defined(ARDUINO_ESP32C3_DEV))
   if (currentServoPos != targetServoPos) {
     if (servoMoveDuration == 0) {
       currentServoPos = targetServoPos;
       posicaoServo = currentServoPos;
-      oServo.write(currentServoPos);
+      writeServoAngle(currentServoPos);
     } else {
-      if (millis() - lastServoWriteTime >=
-          15) { // Limita as atualizações a cada 15ms (não floda o PWM)
+      if (millis() - lastServoWriteTime >= 15) {
         lastServoWriteTime = millis();
         unsigned long elapsed = millis() - servoMoveStartTime;
         if (elapsed >= servoMoveDuration) {
           currentServoPos = targetServoPos;
         } else {
-          float progress = (float)elapsed / servoMoveDuration;
-          currentServoPos =
-              servoStartPos + (targetServoPos - servoStartPos) * progress;
+          // easeInOut gives a gentle start and stop — critical for tonearm safety
+          float progress = easeInOut((float)elapsed / servoMoveDuration);
+          currentServoPos = servoStartPos + (targetServoPos - servoStartPos) * progress;
         }
         posicaoServo = currentServoPos;
-        oServo.write(currentServoPos);
+        writeServoAngle(currentServoPos);
       }
     }
   }
